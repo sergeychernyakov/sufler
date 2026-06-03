@@ -13,10 +13,11 @@ from src.audio.stt import Transcript
 class _FakeCapture:
     """Records the handlers the pipeline wires in and start/stop calls."""
 
-    def __init__(self, *, on_partial, on_final, sample_rate=16000) -> None:
+    def __init__(self, *, on_partial, on_final, sample_rate=16000, device=None) -> None:
         self.on_partial = on_partial
         self.on_final = on_final
         self.sample_rate = sample_rate
+        self.device = device
         self.started = 0
         self.stopped = 0
 
@@ -89,3 +90,23 @@ def test_start_stop_delegate_to_capture() -> None:
     pipeline.stop()
     assert capture.started == 1
     assert capture.stopped == 1
+
+
+def test_device_is_forwarded_to_capture() -> None:
+    captures: dict[str, _FakeCapture] = {}
+
+    def factory(**kwargs):
+        capture = _FakeCapture(**kwargs)
+        captures["capture"] = capture
+        return capture
+
+    SpeechPipeline(
+        MagicMock(),
+        on_partial_text=lambda s: None,
+        on_final_text=lambda s: None,
+        capture_factory=factory,
+        runner=lambda work: work(),
+        device="BlackHole",
+    )
+
+    assert captures["capture"].device == "BlackHole"

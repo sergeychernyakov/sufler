@@ -12,7 +12,7 @@ signal ``emit``).
 from __future__ import annotations
 
 import threading
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 
 import numpy as np
 
@@ -39,6 +39,7 @@ class SpeechPipeline:
         capture_factory: CaptureFactory = MicrophoneCapture,
         runner: Optional[Runner] = None,
         sample_rate: int = 16000,
+        device: Optional[Union[int, str]] = None,
     ) -> None:
         """Builds the pipeline and its capture (does not start listening).
 
@@ -50,6 +51,8 @@ class SpeechPipeline:
             runner (Optional[Runner]): Executes transcription work; defaults to a
                 daemon thread. Tests inject a synchronous runner.
             sample_rate (int): Capture/transcription sample rate in Hz.
+            device (Optional[Union[int, str]]): Input device index or name substring
+                (e.g. ``"BlackHole"``) for loopback capture; ``None`` uses the default input.
         """
         self._engine = engine
         self._on_partial_text = on_partial_text
@@ -60,6 +63,7 @@ class SpeechPipeline:
             on_partial=self._handle_partial_audio,
             on_final=self._handle_final_audio,
             sample_rate=sample_rate,
+            device=device,
         )
 
     def start(self) -> None:

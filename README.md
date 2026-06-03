@@ -14,7 +14,7 @@ A Python desktop app (PyQt6 overlay + Claude + screenshots, later microphone STT
 - **Screenshot → Claude**: multimodal request (text + screen image) with streamed answers; `coach` / `answer` modes
 - **Manual question input** + **global hotkeys** (incl. panic)
 - **Live STT** (MLX Whisper): microphone → partial/final transcription → 30–60 s rolling context
-- **Planned**: loopback audio — capture the interviewer's voice (BlackHole, Phase 7)
+- **Loopback capture** (Phase 7): point STT at a virtual input device (BlackHole) to transcribe the interviewer
 
 **Engineering:**
 
@@ -35,6 +35,10 @@ Grant these to the app/terminal you launch from (System Settings → Privacy & S
 
 Apple Silicon STT uses whisper.cpp (Metal) or `mlx-whisper` (native) — **not**
 faster-whisper (its CTranslate2 backend is CPU-only on Mac).
+
+For **loopback** (transcribing the interviewer rather than your own mic), install
+[BlackHole](https://github.com/ExistentialAudio/BlackHole), route the call's audio to it,
+and set `SUFLER_LOOPBACK_DEVICE=BlackHole`.
 
 ## Setup
 
@@ -224,7 +228,7 @@ logger.error("An error occurred", exc_info=True)
 │   ├── ui/               # overlay.py (PyQt6, stealth) ✅
 │   ├── vision/           # screenshot.py (screencapture/mss) ✅
 │   ├── llm/              # claude.py (multimodal + streaming) ✅
-│   ├── audio/            # capture.py + stt.py + pipeline.py (MLX Whisper) ✅
+│   ├── audio/            # capture + stt + pipeline + devices (MLX Whisper, loopback) ✅
 │   └── core/             # context.py + controller.py + hotkeys.py ✅
 ├── tests/                # Unit tests
 │   └── __init__.py

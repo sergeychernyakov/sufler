@@ -4,12 +4,13 @@
 критерии приёмки и тесты. Спека — это «что» и «зачем»; этот план — «как» и «в каком порядке».
 
 ## Статус (2026-06-03)
-- ✅ **Фазы 1–6** реализованы: overlay, screenshot, Claude-клиент, ручной ввод, rolling context,
-  **STT** (MLX Whisper + микрофон + пайплайн) — плюс контроллер `on_capture`, живая речь в
-  оверлей/контекст и `main.py`. `python main.py` запускает оверлей; STT включается при
-  установленном `mlx-whisper` и выданном праве на микрофон.
-- Покрытие ~98 %, `bin/ci` зелёный. Ветка `feat/app-mvp`.
-- ⏳ Осталось: **Фаза 7 (loopback)** — захват звука собеседника (BlackHole).
+- ✅ **Фазы 1–7** реализованы: overlay, screenshot, Claude-клиент, ручной ввод, rolling context,
+  **STT** (MLX Whisper + микрофон + пайплайн) и **loopback** (выбор входного устройства, BlackHole) —
+  плюс контроллер `on_capture`, живая речь в оверлей/контекст и `main.py`. `python main.py` запускает
+  оверлей; STT включается при установленном `mlx-whisper` и праве на микрофон.
+- Покрытие ~98 %, `bin/ci` зелёный. Ветка `feat/app-mvp`. **MVP по плану завершён.**
+- ⏳ Дальше (вне scope v1): реализация Deepgram, автотриггер по детекту вопроса,
+  ScreenCaptureKit/CoreAudio Taps вместо BlackHole.
 
 ## Принципы
 
@@ -137,7 +138,7 @@ pre-commit, ruff/black/isort/pylint/mypy/bandit/pip-audit, `bin/ci`, `bin/check_
 | **Тесты** | вытеснение по времени; сериализация контекста в запрос Claude |
 | **Покрытие** | `src/core` ≥ 95 % |
 
-### Фаза 7 — Loopback audio  · ветка `feat/loopback-audio`
+### Фаза 7 — Loopback audio ✅  · ветка `feat/loopback-audio`
 | | |
 |---|---|
 | **Файлы** | `src/audio/capture.py` (выбор устройства **BlackHole**), доки по установке |

@@ -37,6 +37,9 @@ line under `[Unreleased]`**.
   _feat(stt)_ / _feat(audio)_
 - **Configurable STT model** via `SUFLER_STT_MODEL` (empty = default `whisper-large-v3-turbo`;
   set e.g. `mlx-community/whisper-small` for lower latency). _feat(config)_
+- **Loopback capture (Phase 7)** — `src/audio/devices.py` resolves input devices by index or
+  name; capture/pipeline accept a `device`; `SUFLER_LOOPBACK_DEVICE` (e.g. `BlackHole`) points
+  STT at the interviewer's audio, falling back to the default input when absent. _feat(audio)_
 - **Tests** across every module — ~98 % coverage (critical packages ≥ 95 %).
 - This **`CHANGELOG.md`** and the practice of tracking every change here. _docs(changelog)_
 

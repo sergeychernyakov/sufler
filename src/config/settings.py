@@ -37,6 +37,7 @@ class Config:
     # Speech-to-text (Phase 5+)
     stt_engine: str = field(default_factory=lambda: os.getenv("SUFLER_STT_ENGINE", "mlx"))
     stt_model: str = field(default_factory=lambda: os.getenv("SUFLER_STT_MODEL", ""))
+    loopback_device: str = field(default_factory=lambda: os.getenv("SUFLER_LOOPBACK_DEVICE", ""))
 
     # Global hotkeys (Phase 3+, pynput syntax)
     hotkey_capture: str = field(default_factory=lambda: os.getenv("SUFLER_HOTKEY_CAPTURE", "<cmd>+<shift>+s"))

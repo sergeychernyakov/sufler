@@ -15,6 +15,7 @@ from typing import Optional
 
 from PyQt6 import QtWidgets
 
+from src.audio.devices import resolve_input_device
 from src.audio.pipeline import SpeechPipeline
 from src.audio.stt import create_engine
 from src.config import config
@@ -71,6 +72,24 @@ def build_app(*, claude: Optional[ClaudeClient] = None) -> tuple[Overlay, Contro
     return overlay, controller, hotkeys
 
 
+def _resolve_loopback_device() -> Optional[int]:
+    """Resolves the configured loopback input device, falling back to the default.
+
+    Returns:
+        Optional[int]: The resolved input-device index, or ``None`` for the system
+        default (also returned, with a warning, when the configured device is absent).
+    """
+    try:
+        return resolve_input_device(config.loopback_device or None)
+    except ValueError:
+        logger.warning(
+            "Loopback device %r not found — install BlackHole or fix SUFLER_LOOPBACK_DEVICE; "
+            "using the default input device instead.",
+            config.loopback_device,
+        )
+        return None
+
+
 def _maybe_start_speech(controller: Controller) -> Optional[SpeechPipeline]:
     """Starts live speech capture if the STT backend is available.
 
@@ -85,13 +104,15 @@ def _maybe_start_speech(controller: Controller) -> Optional[SpeechPipeline]:
         logger.warning("STT disabled: run `pip install mlx-whisper` to enable live speech")
         return None
     try:
+        device = _resolve_loopback_device()
         pipeline = SpeechPipeline(
             create_engine(),
             on_partial_text=controller.partial_speech.emit,
             on_final_text=controller.final_speech.emit,
+            device=device,
         )
         pipeline.start()
-        logger.info("Live STT active (engine=%s)", config.stt_engine)
+        logger.info("Live STT active (engine=%s, device=%s)", config.stt_engine, device)
         return pipeline
     except Exception:  # pylint: disable=broad-exception-caught
         logger.exception("Could not start live STT (microphone permission?)")
