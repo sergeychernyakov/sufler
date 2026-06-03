@@ -45,6 +45,30 @@ DEFAULT_MLX_MODEL: str = "mlx-community/whisper-large-v3-turbo"
 #: Target sample rate (Hz) Whisper models expect for their input audio.
 DEFAULT_SAMPLE_RATE: int = 16000
 
+#: Minimum RMS amplitude to treat a clip as speech. RMS (unlike peak) ignores brief
+#: clicks/spikes, so quiet noise is reliably skipped — normalizing it makes Whisper
+#: hallucinate repeated phrases.
+MIN_SPEECH_RMS: float = 0.008
+
+
+def _is_degenerate(text: str) -> bool:
+    """Detects repetitive/hallucinated transcripts (Whisper degenerates on non-speech).
+
+    Args:
+        text (str): The recognized text.
+
+    Returns:
+        bool: ``True`` if the text looks like a hallucination — very low character or
+        word diversity, e.g. ``"1.0.0.0.0..."`` or ``"2.5% 2.5% 2.5%"``.
+    """
+    stripped = text.strip()
+    if len(stripped) < 8:
+        return False
+    if len(set(stripped)) / len(stripped) < 0.12:
+        return True
+    words = stripped.split()
+    return len(words) >= 5 and len(set(words)) / len(words) < 0.35
+
 
 @dataclass
 class Transcript:
@@ -104,6 +128,28 @@ class MlxWhisperEngine(STTEngine):
                 Defaults to :data:`DEFAULT_MLX_MODEL`.
         """
         self.model: str = model
+        self._local_path: Optional[str] = None
+
+    def _model_path(self) -> str:
+        """Resolves the model to a local snapshot path once (no per-call HF fetch).
+
+        Re-resolving the Hugging Face repo on every ``transcribe`` call triggered a
+        slow network fetch each time; this resolves (downloading once if needed) to a
+        local directory and caches it on the instance.
+
+        Returns:
+            str: Local filesystem path to the model snapshot.
+        """
+        if self._local_path is None:
+            from huggingface_hub import snapshot_download  # pylint: disable=import-outside-toplevel
+
+            # The model repo is user-configured (SUFLER_STT_MODEL); pinning a revision per
+            # arbitrary model is impractical, so B615 (unpinned download) is accepted here.
+            try:
+                self._local_path = snapshot_download(self.model, local_files_only=True)  # nosec B615
+            except Exception:  # noqa: BLE001  # pylint: disable=broad-exception-caught
+                self._local_path = snapshot_download(self.model)  # nosec B615
+        return self._local_path
 
     def transcribe(self, audio: np.ndarray, sample_rate: int = DEFAULT_SAMPLE_RATE) -> Transcript:
         """Transcribe audio with MLX Whisper, auto-detecting the language.
@@ -135,10 +181,26 @@ class MlxWhisperEngine(STTEngine):
             self.model,
         )
 
-        result: dict[str, Any] = mlx_whisper.transcribe(audio, path_or_hf_repo=self.model)
+        # Peak-normalize: quiet microphone audio otherwise transcribes to empty text.
+        audio = np.asarray(audio, dtype=np.float32).reshape(-1)
+        peak = float(np.max(np.abs(audio))) if audio.size else 0.0
+        rms = float(np.sqrt(np.mean(np.square(audio, dtype=np.float64)))) if audio.size else 0.0
+        logger.info("Utterance level: rms=%.4f peak=%.4f samples=%d", rms, peak, audio.size)
+        if rms < MIN_SPEECH_RMS:
+            # Too quiet to be speech: skip. Normalizing near-silent noise makes Whisper hallucinate.
+            logger.debug("Skipping clip below speech RMS (rms=%.4f)", rms)
+            return Transcript(text="", language=None)
+        audio = (audio / peak * 0.95).astype(np.float32) if peak > 1e-4 else audio
+
+        result: dict[str, Any] = mlx_whisper.transcribe(
+            audio, path_or_hf_repo=self._model_path(), condition_on_previous_text=False
+        )
         text = str(result.get("text", "")).strip()
         language = result.get("language")
-        logger.debug("MLX Whisper detected language=%s, text length=%d", language, len(text))
+        if _is_degenerate(text):
+            logger.debug("Discarding degenerate transcript: %r", text[:50])
+            return Transcript(text="", language=language)
+        logger.info("Recognized [lang=%s]: %r", language, text)
         return Transcript(text=text, language=language)
 
 

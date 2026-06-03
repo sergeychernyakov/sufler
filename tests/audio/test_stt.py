@@ -75,7 +75,11 @@ def fake_mlx() -> Iterator[_FakeMlxWhisper]:
         result, so tests can assert on its recorded calls.
     """
     fake = _FakeMlxWhisper({"text": "  привет мир  ", "language": "ru"})
-    with patch.dict("sys.modules", {"mlx_whisper": fake}):
+    # Also stub model resolution so transcribe never hits Hugging Face in tests.
+    with (
+        patch.dict("sys.modules", {"mlx_whisper": fake}),
+        patch.object(MlxWhisperEngine, "_model_path", lambda self: self.model),
+    ):
         yield fake
 
 
@@ -206,7 +210,8 @@ def test_mlx_transcribe_passes_model_through(fake_mlx: _FakeMlxWhisper) -> None:
     assert len(fake_mlx.calls) == 1
     call = fake_mlx.calls[0]
     assert call["kwargs"]["path_or_hf_repo"] == "mlx-community/whisper-small"
-    assert call["audio"] is audio
+    # The engine peak-normalizes before transcribing, so it passes a (same-length) copy.
+    assert call["audio"].size == audio.size
 
 
 def test_mlx_transcribe_handles_missing_language(fake_mlx: _FakeMlxWhisper) -> None:
