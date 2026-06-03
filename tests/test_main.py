@@ -33,11 +33,13 @@ def test_build_app_uses_injected_claude(qtbot) -> None:
     assert controller._claude is fake_claude  # noqa: SLF001  (white-box wiring check)
 
 
-def test_maybe_start_speech_disabled_without_mlx() -> None:
-    # mlx_whisper is not installed in the test environment -> STT is disabled.
-    from main import _maybe_start_speech
+def test_maybe_start_speech_disabled_when_backend_missing(monkeypatch) -> None:
+    import main as main_module
 
-    assert _maybe_start_speech(MagicMock()) is None
+    # Force "mlx_whisper not installed" so STT is disabled — deterministic regardless
+    # of whether mlx-whisper happens to be installed, and never opens a real microphone.
+    monkeypatch.setattr(main_module.importlib.util, "find_spec", lambda name: None)
+    assert main_module._maybe_start_speech(MagicMock()) is None
 
 
 def test_maybe_start_speech_starts_pipeline(monkeypatch) -> None:

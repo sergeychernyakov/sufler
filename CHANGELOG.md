@@ -35,6 +35,8 @@ line under `[Unreleased]`**.
   (~0.7 s) segmentation; speech pipeline; live partial/final speech routed into the
   overlay and rolling context; started from `main` when the backend is available.
   _feat(stt)_ / _feat(audio)_
+- **Configurable STT model** via `SUFLER_STT_MODEL` (empty = default `whisper-large-v3-turbo`;
+  set e.g. `mlx-community/whisper-small` for lower latency). _feat(config)_
 - **Tests** across every module — ~98 % coverage (critical packages ≥ 95 %).
 - This **`CHANGELOG.md`** and the practice of tracking every change here. _docs(changelog)_
 
@@ -47,6 +49,8 @@ line under `[Unreleased]`**.
 - `secret-scan` scoped to skip `tests/` fixtures and `.claude/` worktrees. _fix(tooling)_
 - Template correctness: `main.py` return type `NoReturn` → `None`; `base.py` validator
   return types and dict-key typing.
+- STT-start unit test no longer opens a real microphone (nor loads pyobjc), which
+  segfaulted the test suite once `mlx-whisper` was installed. _fix(test)_
 
 ### Security
 - `bandit`, `pip-audit`, private-key detection and a hardcoded-credential scan wired into

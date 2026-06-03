@@ -2,6 +2,8 @@
 
 """Tests for the pynput-to-Qt HotkeyManager (no real global listener)."""
 
+import sys
+import types
 from unittest.mock import MagicMock
 
 from src.core.hotkeys import HotkeyManager
@@ -35,10 +37,15 @@ def test_invoking_a_binding_emits_its_signal() -> None:
 
 
 def test_start_and_stop_drive_the_listener(monkeypatch) -> None:
-    from pynput import keyboard
-
+    # Inject a fake ``pynput.keyboard`` so the real pyobjc-backed module never loads:
+    # importing AppKit/Quartz alongside Qt's QApplication segfaults on macOS.
     fake_listener = MagicMock()
-    monkeypatch.setattr(keyboard, "GlobalHotKeys", lambda bindings: fake_listener)
+    fake_keyboard = types.ModuleType("pynput.keyboard")
+    fake_keyboard.GlobalHotKeys = MagicMock(return_value=fake_listener)
+    fake_pynput = types.ModuleType("pynput")
+    fake_pynput.keyboard = fake_keyboard
+    monkeypatch.setitem(sys.modules, "pynput", fake_pynput)
+    monkeypatch.setitem(sys.modules, "pynput.keyboard", fake_keyboard)
 
     manager = _make()
     manager.start()
