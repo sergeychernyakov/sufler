@@ -9,6 +9,11 @@ line under `[Unreleased]`**.
 
 ## [Unreleased]
 
+### Fixed
+- **App icon transparency** — the source icon was flattened to RGB, so its corners rendered as
+  opaque white in the Dock / app switcher; restored an alpha channel (transparent squircle corners),
+  which the bundle and `app.setWindowIcon` now carry through. _fix(ui)_
+
 ## [0.2.0] - 2026-06-03
 
 ### Added
