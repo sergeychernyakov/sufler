@@ -25,7 +25,7 @@ from src.core.context import RollingContext
 from src.core.controller import Controller
 from src.core.hotkeys import HotkeyManager
 from src.helpers.logger import get_logger
-from src.llm.factory import AnswerClient, create_answer_client
+from src.llm.factory import AnswerClient, available_models, create_answer_client, current_model
 from src.models.enums import Mode, SttEngine
 from src.ui.overlay import Overlay
 
@@ -72,6 +72,9 @@ def build_app(*, claude: Optional[AnswerClient] = None) -> tuple[Overlay, Contro
     overlay.input_volume_changed.connect(controller.on_input_volume_changed)
     overlay.term_activated.connect(controller.on_term_clicked)
     overlay.back_requested.connect(controller.on_back)
+    overlay.forward_requested.connect(controller.on_forward)
+    overlay.model_changed.connect(controller.on_model_changed)
+    overlay.set_models(list(available_models()), current_model())
 
     hotkeys = HotkeyManager(
         capture_hotkey=config.hotkey_capture,

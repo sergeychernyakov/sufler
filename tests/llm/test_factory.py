@@ -61,3 +61,16 @@ def test_unknown_provider_raises_value_error() -> None:
     # Act / Assert
     with pytest.raises(ValueError, match="Unknown LLM provider"):
         create_answer_client("does-not-exist")
+
+
+def test_available_models_lists_provider_models(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``available_models`` returns the curated list for the configured provider."""
+    monkeypatch.setattr(factory.config, "llm_provider", "groq")
+    assert "llama-3.3-70b-versatile" in factory.available_models()
+
+
+def test_current_model_returns_configured_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``current_model`` returns the configured model id for the provider."""
+    monkeypatch.setattr(factory.config, "llm_provider", "groq")
+    monkeypatch.setattr(factory.config, "groq_model", "the-model")
+    assert factory.current_model() == "the-model"

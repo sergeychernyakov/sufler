@@ -37,6 +37,8 @@ class Config:
     auto_answer: bool = field(
         default_factory=lambda: os.getenv("SUFLER_AUTO_ANSWER", "true").strip().lower() in ("1", "true", "yes", "on")
     )
+    # Number of points/theses the answer should contain.
+    answer_points: int = field(default_factory=lambda: int(os.getenv("SUFLER_ANSWER_POINTS", "7") or "7"))
 
     # Answer LLM provider: "claude" (Anthropic, paid) or "gemini" (Google, free tier).
     llm_provider: str = field(default_factory=lambda: os.getenv("SUFLER_LLM_PROVIDER", "claude"))

@@ -583,3 +583,32 @@ def test_back_button_emits_back_requested(overlay: Overlay, qtbot) -> None:
     """Activating the back button emits ``back_requested``."""
     with qtbot.waitSignal(overlay.back_requested, timeout=1000):
         overlay._back_button.click()
+
+
+def test_forward_button_hidden_by_default_and_toggles(overlay: Overlay) -> None:
+    """The forward button is hidden by default and shown via set_forward_visible."""
+    assert overlay._forward_button.isHidden() is True
+    overlay.set_forward_visible(True)
+    assert overlay._forward_button.isHidden() is False
+
+
+def test_forward_button_emits_forward_requested(overlay: Overlay, qtbot) -> None:
+    """Activating the forward button emits ``forward_requested``."""
+    with qtbot.waitSignal(overlay.forward_requested, timeout=1000):
+        overlay._forward_button.click()
+
+
+def test_model_selector_populates_and_emits_on_user_pick(overlay: Overlay, qtbot) -> None:
+    """set_models fills the selector; a user pick emits ``model_changed``."""
+    overlay.set_models(["m1", "m2"], "m2")
+    assert overlay.selected_model() == "m2"
+    with qtbot.waitSignal(overlay.model_changed, timeout=1000) as blocker:
+        overlay._model_combo.textActivated.emit("m1")  # simulate a user selection
+    assert blocker.args == ["m1"]
+
+
+def test_set_models_does_not_emit(overlay: Overlay, qtbot) -> None:
+    """Populating the selector programmatically does not emit ``model_changed``."""
+    with qtbot.assertNotEmitted(overlay.model_changed):
+        overlay.set_models(["a", "b"], "b")
+    assert overlay.selected_model() == "b"

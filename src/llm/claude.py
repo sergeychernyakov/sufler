@@ -39,14 +39,14 @@ _BASE_SYSTEM_PROMPT: str = (
 )
 
 _ANSWER_INSTRUCTIONS: str = (
-    "Режим ANSWER: дай краткий готовый ответ в виде 2–4 предельно сжатых пунктов "
+    "Режим ANSWER: дай краткий готовый ответ в виде до {points} предельно сжатых пунктов "
     "(bullet points). Каждый пункт — одна короткая мысль, которую можно сразу "
     "произнести вслух. Не добавляй вступления, пояснения или заключение."
 )
 
 _COACH_INSTRUCTIONS: str = (
     "Режим COACH: НЕ давай готовый ответ. "
-    "Вместо этого дай ровно 3 тезиса-опоры (3 supporting theses), "
+    "Вместо этого дай ровно {points} тезисов-опор ({points} supporting theses), "
     "чтобы человек сформулировал ответ сам своими словами. "
     "Тезисы — это направления и ключевые слова, а не развёрнутые формулировки."
 )
@@ -90,6 +90,14 @@ class ClaudeClient:
         else:
             self._client = anthropic.Anthropic(api_key=api_key or config.anthropic_api_key or "MISSING_API_KEY")
 
+    def set_model(self, model: str) -> None:
+        """Switches the Claude model used for subsequent requests.
+
+        Args:
+            model (str): The new Claude model id.
+        """
+        self.model = model
+
     @staticmethod
     def build_system_prompt(mode: Mode) -> str:
         """Builds the system prompt for the given answer mode.
@@ -101,7 +109,7 @@ class ClaudeClient:
             str: The base senior-prompter persona combined with mode-specific
             formatting instructions.
         """
-        instructions = _MODE_INSTRUCTIONS[mode]
+        instructions = _MODE_INSTRUCTIONS[mode].format(points=config.answer_points)
         return f"{_BASE_SYSTEM_PROMPT}\n\n{instructions}"
 
     @staticmethod
