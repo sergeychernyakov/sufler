@@ -34,6 +34,9 @@ line under `[Unreleased]`**.
   a metadata-only Hugging Face cache (weights missing) and never fetched them, so every
   transcription raised and was swallowed. The full snapshot is now fetched first (completing a
   partial cache); `local_files_only` is only an offline fallback. _fix(stt)_
+- **Filter Whisper silence hallucinations** — discard the YouTube-subtitle artefacts Whisper emits
+  on non-speech (e.g. "Субтитры сделал DimaTorzok", "Продолжение следует", "Thank you.", a bare
+  "You") so they no longer appear in the window. _fix(stt)_
 
 ## [0.2.0] - 2026-06-03
 
