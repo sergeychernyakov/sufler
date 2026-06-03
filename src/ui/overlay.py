@@ -85,6 +85,8 @@ class _LevelMeter(QtWidgets.QWidget):
         """Paints the bars: green, then amber, then red towards the top."""
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
+        if not self.isEnabled():
+            painter.setOpacity(0.4)  # fade the whole meter when the mic is off
         width = float(self.width())
         height = float(self.height())
         gap = 2.0
@@ -440,6 +442,9 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
                 font-size: 11px;
                 min-width: 64px;
             }
+            QLabel#controlLabel:disabled {
+                color: #5a5a62;
+            }
             QSlider#volumeSlider::groove:horizontal {
                 height: 4px;
                 background: rgba(255, 255, 255, 40);
@@ -449,11 +454,17 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
                 background: #5ed16a;
                 border-radius: 2px;
             }
+            QSlider#volumeSlider::sub-page:horizontal:disabled {
+                background: rgba(255, 255, 255, 30);
+            }
             QSlider#volumeSlider::handle:horizontal {
                 width: 12px;
                 margin: -5px 0;
                 border-radius: 6px;
                 background: #f2f2f2;
+            }
+            QSlider#volumeSlider::handle:horizontal:disabled {
+                background: #6a6a72;
             }
         """
 
@@ -481,8 +492,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
             listening (bool): The button's new checked state (``True`` = listening).
         """
         self._update_mic_visuals()
-        if not listening:
-            self._level_meter.set_level(0.0)
+        self._sync_input_controls()
         logger.debug("Microphone %s by user", "enabled" if listening else "disabled")
         self.mic_toggled.emit(listening)
 
@@ -498,6 +508,21 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         """Re-emits a user slider change as :pyattr:`input_volume_changed`."""
         logger.debug("Input volume slider -> %d%%", percent)
         self.input_volume_changed.emit(percent)
+
+    def _sync_input_controls(self) -> None:
+        """Dims the mic input controls when not listening, and zeroes the level meter.
+
+        Active = the mic toggle is both on and available. When inactive, the volume
+        slider, its labels and the level meter are disabled (greyed via the
+        ``:disabled`` style) and the meter is reset to zero.
+        """
+        active = self._mic_button.isChecked() and self._mic_button.isEnabled()
+        self._volume_label.setEnabled(active)
+        self._volume_slider.setEnabled(active)
+        self._level_label.setEnabled(active)
+        self._level_meter.setEnabled(active)
+        if not active:
+            self._level_meter.set_level(0.0)
 
     # ------------------------------------------------------------------ #
     # Content API
@@ -584,8 +609,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         """
         self._mic_button.setChecked(listening)
         self._update_mic_visuals()
-        if not listening:
-            self._level_meter.set_level(0.0)
+        self._sync_input_controls()
 
     def is_listening(self) -> bool:
         """Returns whether the mic toggle is in the listening (on) state.
@@ -606,11 +630,12 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._mic_button.setEnabled(enabled)
         if enabled:
             self._update_mic_visuals()
+            self._sync_input_controls()
             return
         self._mic_button.setChecked(False)
         self._mic_button.setIcon(self._mic_icon(False))
         self._mic_button.setToolTip("Распознавание речи недоступно")
-        self._level_meter.set_level(0.0)
+        self._sync_input_controls()
 
     # ------------------------------------------------------------------ #
     # Microphone input volume + live level

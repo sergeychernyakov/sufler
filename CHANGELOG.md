@@ -21,7 +21,8 @@ line under `[Unreleased]`**.
   and the macOS bundle display name (Dock / ⌘-Tab). _feat(ui)_
 - **Microphone input-volume slider** + a **live input-level meter** in the overlay — adjust the
   system mic gain without opening System Settings, and see the mic working at a glance (the meter
-  bars turn amber/red to warn of clipping). System volume is read/set via `osascript`. _feat(ui)_
+  bars turn amber/red to warn of clipping). Muting the mic dims these controls and drops the meter
+  to zero. System volume is read/set via `osascript`. _feat(ui)_
 
 ### Fixed
 - **App icon transparency** — the source icon was flattened to RGB, so its corners rendered as
