@@ -26,7 +26,15 @@ import numpy as np
 import pytest
 
 from src.audio import stt
-from src.audio.stt import DEFAULT_MLX_MODEL, DeepgramEngine, MlxWhisperEngine, STTEngine, Transcript, create_engine
+from src.audio.stt import (
+    DEFAULT_MLX_MODEL,
+    DeepgramEngine,
+    MlxWhisperEngine,
+    STTEngine,
+    Transcript,
+    _is_hallucination,
+    create_engine,
+)
 from src.models.enums import SttEngine
 
 
@@ -371,3 +379,46 @@ def test_create_engine_mlx_language_defaults_to_none(monkeypatch: pytest.MonkeyP
     # Assert
     assert isinstance(engine, MlxWhisperEngine)
     assert engine.language is None
+
+
+# --------------------------------------------------------------------------- #
+# Hallucination filtering (silence artefacts)
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Субтитры сделал DimaTorzok", True),
+        ("Субтитры создавал DimaTorzok", True),
+        ("Продолжение следует...", True),
+        ("Спасибо за просмотр!", True),
+        ("You", True),
+        ("Thank you.", True),
+        ("расскажи про индексы в postgres", False),
+        ("привет мир", False),
+        ("спасибо", False),
+        ("", False),
+    ],
+)
+def test_is_hallucination(text: str, expected: bool) -> None:
+    """Known silence artefacts are flagged; real speech is not."""
+    assert _is_hallucination(text) is expected
+
+
+def test_mlx_transcribe_discards_subtitle_hallucination(fake_mlx: _FakeMlxWhisper) -> None:
+    """The 'Субтитры сделал DimaTorzok' silence hallucination is discarded."""
+    # Arrange
+    fake_mlx._result = {"text": "Субтитры сделал DimaTorzok", "language": "ru"}  # pylint: disable=protected-access
+    engine = MlxWhisperEngine()
+
+    # Act / Assert
+    assert engine.transcribe(_fake_audio()).text == ""
+
+
+def test_mlx_transcribe_discards_english_silence_filler(fake_mlx: _FakeMlxWhisper) -> None:
+    """A bare 'You' (classic English silence hallucination) is discarded."""
+    # Arrange
+    fake_mlx._result = {"text": "You", "language": "en"}  # pylint: disable=protected-access
+    engine = MlxWhisperEngine()
+
+    # Act / Assert
+    assert engine.transcribe(_fake_audio()).text == ""

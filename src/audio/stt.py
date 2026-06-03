@@ -71,6 +71,49 @@ def _is_degenerate(text: str) -> bool:
     return len(words) >= 5 and len(set(words)) / len(words) < 0.35
 
 
+#: Substrings marking a Whisper hallucination on silence/non-speech — YouTube subtitle
+#: credits and stock phrases baked into the training data that never occur in real
+#: interview speech (e.g. the infamous "Субтитры сделал DimaTorzok").
+_HALLUCINATION_MARKERS: tuple[str, ...] = (
+    "dimatorzok",
+    "субтитры сдел",
+    "субтитры созда",
+    "субтитры подготов",
+    "редактор субтитров",
+    "продолжение следует",
+    "спасибо за просмотр",
+    "подписывайтесь",
+    "ставьте лайк",
+    "amara.org",
+)
+
+#: Whole short transcripts that are almost always silence hallucinations.
+_HALLUCINATION_EXACT: frozenset[str] = frozenset(
+    {"you", "thank you", "thanks for watching", "bye", "продолжение следует"}
+)
+
+
+def _is_hallucination(text: str) -> bool:
+    """Detects known Whisper hallucinations on silence/non-speech.
+
+    Whisper emits YouTube-subtitle credits and stock phrases on near-silent audio —
+    e.g. "Субтитры сделал DimaTorzok", "Продолжение следует", "Thank you." — which
+    never occur in real interview speech.
+
+    Args:
+        text (str): The recognized text.
+
+    Returns:
+        bool: ``True`` if the text looks like a silence hallucination.
+    """
+    norm = " ".join(text.lower().split()).strip(" .!?,…-")
+    if not norm:
+        return False
+    if norm in _HALLUCINATION_EXACT:
+        return True
+    return any(marker in norm for marker in _HALLUCINATION_MARKERS)
+
+
 @dataclass
 class Transcript:
     """The result of transcribing a chunk of audio.
@@ -211,8 +254,8 @@ class MlxWhisperEngine(STTEngine):
         )
         text = str(result.get("text", "")).strip()
         language = result.get("language")
-        if _is_degenerate(text):
-            logger.debug("Discarding degenerate transcript: %r", text[:50])
+        if _is_degenerate(text) or _is_hallucination(text):
+            logger.debug("Discarding hallucinated/degenerate transcript: %r", text[:60])
             return Transcript(text="", language=language)
         logger.info("Recognized [lang=%s]: %r", language, text)
         return Transcript(text=text, language=language)
