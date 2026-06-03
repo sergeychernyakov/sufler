@@ -10,8 +10,9 @@ change (``SUFLER_STT_ENGINE``).
 
 Engines:
     * :class:`MlxWhisperEngine` — the default. Runs Whisper natively on Apple
-      Silicon via :mod:`mlx_whisper`. Language is auto-detected, which is what
-      we want for Russian + English code-switching during interviews.
+      Silicon via :mod:`mlx_whisper`. Language is auto-detected by default (best
+      for the Russian + English code-switching heard in interviews), or can be
+      pinned via ``SUFLER_STT_LANGUAGE`` to remove auto-detection garbage.
     * :class:`DeepgramEngine` — an interface-only stub. The streaming websocket
       implementation lands in a later phase.
 
@@ -120,14 +121,19 @@ class MlxWhisperEngine(STTEngine):
         model (str): The MLX Whisper model repo / local path used for inference.
     """
 
-    def __init__(self, model: str = DEFAULT_MLX_MODEL) -> None:
+    def __init__(self, model: str = DEFAULT_MLX_MODEL, language: Optional[str] = None) -> None:
         """Initialise the engine.
 
         Args:
             model (str): MLX Whisper Hugging Face repo id or local path.
                 Defaults to :data:`DEFAULT_MLX_MODEL`.
+            language (Optional[str]): ISO code to force (e.g. ``"ru"`` / ``"en"``).
+                ``None`` (default) auto-detects the language per utterance — needed
+                for mixed Russian/English speech. Pinning a language removes
+                auto-detection garbage but transliterates the other language's words.
         """
         self.model: str = model
+        self.language: Optional[str] = language
         self._local_path: Optional[str] = None
 
     def _model_path(self) -> str:
@@ -175,10 +181,11 @@ class MlxWhisperEngine(STTEngine):
             ) from exc
 
         logger.info(
-            "Transcribing %d samples (sample_rate=%d Hz) with MLX Whisper model %s",
+            "Transcribing %d samples (sample_rate=%d Hz) with MLX Whisper model %s (language=%s)",
             int(audio.shape[0]) if audio.ndim else 0,
             sample_rate,
             self.model,
+            self.language or "auto",
         )
 
         # Peak-normalize: quiet microphone audio otherwise transcribes to empty text.
@@ -193,7 +200,10 @@ class MlxWhisperEngine(STTEngine):
         audio = (audio / peak * 0.95).astype(np.float32) if peak > 1e-4 else audio
 
         result: dict[str, Any] = mlx_whisper.transcribe(
-            audio, path_or_hf_repo=self._model_path(), condition_on_previous_text=False
+            audio,
+            path_or_hf_repo=self._model_path(),
+            language=self.language,
+            condition_on_previous_text=False,
         )
         text = str(result.get("text", "")).strip()
         language = result.get("language")
@@ -264,6 +274,8 @@ def create_engine(engine: SttEngine | str | None = None, **kwargs: Any) -> STTEn
     if selected is SttEngine.MLX:
         if "model" not in kwargs and config.stt_model:
             kwargs["model"] = config.stt_model
+        if "language" not in kwargs and config.stt_language:
+            kwargs["language"] = config.stt_language
         return MlxWhisperEngine(**kwargs)
     if selected is SttEngine.DEEPGRAM:
         return DeepgramEngine(**kwargs)
