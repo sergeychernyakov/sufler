@@ -9,6 +9,12 @@ line under `[Unreleased]`**.
 
 ## [Unreleased]
 
+### Added
+- **Microphone toggle button** in the overlay — listening is **on by default**. The button
+  shows a filled green mic while listening and a dimmed, slashed mic when muted; muting closes
+  the input stream (so the macOS microphone indicator turns off too). It is disabled when no STT
+  backend is available. _feat(ui)_
+
 ### Fixed
 - **App icon transparency** — the source icon was flattened to RGB, so its corners rendered as
   opaque white in the Dock / app switcher; restored an alpha channel (transparent squircle corners),

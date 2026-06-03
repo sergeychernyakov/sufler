@@ -95,6 +95,21 @@ def test_start_stop_delegate_to_capture() -> None:
     assert capture.stopped == 1
 
 
+def test_set_listening_starts_and_stops_idempotently() -> None:
+    pipeline, capture, _, _, _ = _make()
+    assert pipeline.is_listening is False
+
+    pipeline.set_listening(True)
+    pipeline.set_listening(True)  # idempotent: no second stream
+    assert pipeline.is_listening is True
+    assert capture.started == 1
+
+    pipeline.set_listening(False)
+    pipeline.set_listening(False)  # idempotent: no double stop
+    assert pipeline.is_listening is False
+    assert capture.stopped == 1
+
+
 def test_device_is_forwarded_to_capture() -> None:
     captures: dict[str, _FakeCapture] = {}
 

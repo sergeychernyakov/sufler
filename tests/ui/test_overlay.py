@@ -323,3 +323,52 @@ def test_demo_builds_and_shows_overlay(qtbot, monkeypatch: pytest.MonkeyPatch) -
     assert isinstance(created.get("overlay"), Overlay)
     assert created["overlay"].question_text() != ""
     assert QApplication.instance() is not None
+
+
+# --------------------------------------------------------------------------- #
+# Microphone toggle
+# --------------------------------------------------------------------------- #
+def test_mic_button_defaults_to_listening(overlay: Overlay) -> None:
+    """The mic toggle starts in the listening (on) state."""
+    # Assert
+    assert overlay.is_listening() is True
+
+
+def test_mic_click_toggles_state_and_emits(overlay: Overlay, qtbot) -> None:
+    """Clicking the mic mutes it and emits ``mic_toggled(False)``, then back on."""
+    # Act / Assert: first click turns listening off.
+    with qtbot.waitSignal(overlay.mic_toggled, timeout=1000) as blocker:
+        qtbot.mouseClick(overlay._mic_button, Qt.MouseButton.LeftButton)
+    assert blocker.args == [False]
+    assert overlay.is_listening() is False
+
+    # Act / Assert: a second click turns it back on.
+    with qtbot.waitSignal(overlay.mic_toggled, timeout=1000) as blocker:
+        qtbot.mouseClick(overlay._mic_button, Qt.MouseButton.LeftButton)
+    assert blocker.args == [True]
+    assert overlay.is_listening() is True
+
+
+def test_set_listening_updates_state_without_emitting(overlay: Overlay, qtbot) -> None:
+    """``set_listening`` syncs the button without emitting ``mic_toggled``."""
+    # Act / Assert
+    with qtbot.assertNotEmitted(overlay.mic_toggled):
+        overlay.set_listening(False)
+    assert overlay.is_listening() is False
+
+    overlay.set_listening(True)
+    assert overlay.is_listening() is True
+
+
+def test_set_mic_enabled_false_disables_and_mutes(overlay: Overlay) -> None:
+    """Disabling the mic (STT unavailable) mutes it and disables the button."""
+    # Act
+    overlay.set_mic_enabled(False)
+
+    # Assert
+    assert overlay.is_listening() is False
+    assert overlay._mic_button.isEnabled() is False
+
+    # Act: re-enabling restores an interactive button.
+    overlay.set_mic_enabled(True)
+    assert overlay._mic_button.isEnabled() is True
