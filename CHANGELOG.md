@@ -32,8 +32,13 @@ line under `[Unreleased]`**.
   `*_MODEL`. _feat(llm)_
 - **"Thinking" spinner** — an animated indicator in the answer area while the LLM generates,
   replaced by the first streamed token (and showing "(пустой ответ)" if nothing comes back). _feat(ui)_
+- **Auto-answer recognized speech** — each finalized utterance is answered automatically (the live
+  prompter flow): speak a question → it answers. Toggle in the window ("Авто-ответ") or via
+  `SUFLER_AUTO_ANSWER`. _feat(controller)_
 
 ### Fixed
+- **Question/answer text is selectable** (copyable) in the window — the question label was not
+  selectable before. _fix(ui)_
 - **App icon transparency** — the source icon was flattened to RGB, so its corners rendered as
   opaque white in the Dock / app switcher; restored an alpha channel (transparent squircle corners),
   which the bundle and `app.setWindowIcon` now carry through. _fix(ui)_

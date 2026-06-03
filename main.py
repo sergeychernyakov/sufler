@@ -64,12 +64,14 @@ def build_app(*, claude: Optional[AnswerClient] = None) -> tuple[Overlay, Contro
     overlay = Overlay(stealth=config.stealth)
     claude_client = claude or create_answer_client()
     context = RollingContext()
-    controller = Controller(overlay, claude_client, context, mode=_resolve_mode())
+    controller = Controller(overlay, claude_client, context, mode=_resolve_mode(), auto_answer=config.auto_answer)
 
     overlay.capture_requested.connect(controller.on_capture)
     overlay.text_submitted.connect(controller.on_submit_text)
     overlay.mic_toggled.connect(controller.on_mic_toggled)
     overlay.input_volume_changed.connect(controller.on_input_volume_changed)
+    overlay.auto_answer_toggled.connect(controller.set_auto_answer)
+    overlay.set_auto_answer_enabled(config.auto_answer)
 
     hotkeys = HotkeyManager(
         capture_hotkey=config.hotkey_capture,

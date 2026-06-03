@@ -137,6 +137,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
     text_submitted = pyqtSignal(str)
     mic_toggled = pyqtSignal(bool)
     input_volume_changed = pyqtSignal(int)
+    auto_answer_toggled = pyqtSignal(bool)
 
     def __init__(self, parent: QtWidgets.QWidget | None = None, *, stealth: bool = False) -> None:
         """Builds the overlay window and lays out widgets.
@@ -287,6 +288,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._question_label.setObjectName("questionLabel")
         self._question_label.setWordWrap(True)
         self._question_label.setTextFormat(Qt.TextFormat.PlainText)
+        self._question_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
 
         self._answer_label = QtWidgets.QLabel("", self)
         self._answer_label.setObjectName("answerLabel")
@@ -330,6 +332,10 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._transcript_toggle = QtWidgets.QCheckBox("Показывать распознавание", self)
         self._transcript_toggle.setObjectName("transcriptToggle")
         self._transcript_toggle.setChecked(True)
+
+        self._auto_answer_toggle = QtWidgets.QCheckBox("Авто-ответ на распознанное", self)
+        self._auto_answer_toggle.setObjectName("autoAnswerToggle")
+        self._auto_answer_toggle.setChecked(True)
 
         # Microphone input-volume slider + live level meter (no trip to System Settings).
         self._volume_label = QtWidgets.QLabel("Громкость", self)
@@ -377,6 +383,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         layout.addLayout(level_row)
 
         layout.addWidget(self._transcript_toggle)
+        layout.addWidget(self._auto_answer_toggle)
 
     def _connect_signals(self) -> None:
         """Wires child-widget signals to the overlay's public signals."""
@@ -385,6 +392,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._input_field.returnPressed.connect(self._on_input_submitted)
         self._send_button.clicked.connect(self._on_input_submitted)
         self._transcript_toggle.toggled.connect(self.set_transcript_visible)
+        self._auto_answer_toggle.toggled.connect(self.auto_answer_toggled)
         self._volume_slider.valueChanged.connect(self._on_volume_changed)
 
     def _build_shortcuts(self) -> None:
@@ -493,7 +501,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
                 color: #cfe8ff;
                 font-size: 12px;
             }
-            QCheckBox#transcriptToggle {
+            QCheckBox#transcriptToggle, QCheckBox#autoAnswerToggle {
                 color: #b8b8c0;
                 font-size: 11px;
             }
@@ -671,6 +679,24 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
             bool: ``True`` if the transcript area is visible.
         """
         return self._transcript.isVisible()
+
+    def set_auto_answer_enabled(self, enabled: bool) -> None:
+        """Reflects the auto-answer state on its checkbox (no signal emitted).
+
+        Args:
+            enabled (bool): ``True`` ticks the auto-answer checkbox.
+        """
+        self._auto_answer_toggle.blockSignals(True)
+        self._auto_answer_toggle.setChecked(enabled)
+        self._auto_answer_toggle.blockSignals(False)
+
+    def is_auto_answer_enabled(self) -> bool:
+        """Returns whether the auto-answer checkbox is ticked.
+
+        Returns:
+            bool: ``True`` when auto-answer is enabled.
+        """
+        return self._auto_answer_toggle.isChecked()
 
     # ------------------------------------------------------------------ #
     # Microphone (listening) control

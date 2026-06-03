@@ -62,6 +62,7 @@ class Controller(QObject):
         runner: Optional[Runner] = None,
         hide_delay: float = HIDE_BEFORE_CAPTURE_SECONDS,
         set_input_volume: Callable[[int], bool] = default_set_input_volume,
+        auto_answer: bool = True,
     ) -> None:
         """Wires the controller to its collaborators.
 
@@ -86,6 +87,7 @@ class Controller(QObject):
         self._runner: Runner = runner or self._spawn_thread
         self._hide_delay = hide_delay
         self._set_input_volume = set_input_volume
+        self.auto_answer = auto_answer
         self._speech: Optional[SpeechControl] = None
         self.answer_token.connect(self._overlay.append_answer)
         self.partial_speech.connect(self._on_partial_speech)
@@ -133,6 +135,15 @@ class Controller(QObject):
         self.mode = mode
         self._overlay.set_mode(mode)
 
+    def set_auto_answer(self, enabled: bool) -> None:
+        """Enables/disables auto-answering each finalized recognized utterance.
+
+        Args:
+            enabled (bool): ``True`` to answer recognized speech automatically.
+        """
+        self.auto_answer = enabled
+        logger.info("Auto-answer %s", "on" if enabled else "off")
+
     def set_speech_pipeline(self, pipeline: SpeechControl) -> None:
         """Attaches the live-speech pipeline so the mic toggle can pause/resume it.
 
@@ -170,11 +181,17 @@ class Controller(QObject):
         self._overlay.set_question(text)
 
     def _on_final_speech(self, text: str) -> None:
-        """Records a finalised utterance into the rolling context and transcript."""
+        """Records a finalised utterance, then auto-answers it when enabled.
+
+        Args:
+            text (str): The finalized recognized utterance.
+        """
         self._context.add_speech(text)
         self._context.set_question(text)
         self._overlay.set_question(text)
         self._overlay.append_transcript(text)
+        if self.auto_answer:
+            self._start_stream(text, image_b64=None)
 
     # ------------------------------------------------------------------ #
     # Internals

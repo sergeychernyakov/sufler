@@ -33,6 +33,10 @@ class Config:
     model: str = field(default_factory=lambda: os.getenv("SUFLER_MODEL", "claude-sonnet-4-6"))
     mode: str = field(default_factory=lambda: os.getenv("SUFLER_MODE", "coach"))
     answer_lang: str = field(default_factory=lambda: os.getenv("SUFLER_ANSWER_LANG", "ru"))
+    # Auto-answer each finalized recognized utterance (the live-prompter behaviour).
+    auto_answer: bool = field(
+        default_factory=lambda: os.getenv("SUFLER_AUTO_ANSWER", "true").strip().lower() in ("1", "true", "yes", "on")
+    )
 
     # Answer LLM provider: "claude" (Anthropic, paid) or "gemini" (Google, free tier).
     llm_provider: str = field(default_factory=lambda: os.getenv("SUFLER_LLM_PROVIDER", "claude"))
