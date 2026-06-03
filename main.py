@@ -70,8 +70,6 @@ def build_app(*, claude: Optional[AnswerClient] = None) -> tuple[Overlay, Contro
     overlay.text_submitted.connect(controller.on_submit_text)
     overlay.mic_toggled.connect(controller.on_mic_toggled)
     overlay.input_volume_changed.connect(controller.on_input_volume_changed)
-    overlay.auto_answer_toggled.connect(controller.set_auto_answer)
-    overlay.set_auto_answer_enabled(config.auto_answer)
 
     hotkeys = HotkeyManager(
         capture_hotkey=config.hotkey_capture,
