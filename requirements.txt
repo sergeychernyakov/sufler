@@ -23,6 +23,6 @@ anthropic>=0.40
 python-dotenv>=1.0
 pydantic>=2.7
 
-# ── Speech-to-text (Apple Silicon) — pick one when STT lands (spec step 5) ──
-# whisper.cpp is an external binary/server (Metal); see README for the build.
-# mlx-whisper>=0.4        # native Apple Silicon Whisper (pip-installable)
+# ── Speech-to-text (Apple Silicon, Phase 5) ──
+# Default engine. whisper.cpp (external Metal binary/server) is an alternative — see README.
+mlx-whisper>=0.4          # native Apple Silicon Whisper

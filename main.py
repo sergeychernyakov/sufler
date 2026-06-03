@@ -9,18 +9,21 @@ wiring (and is unit-tested); ``main`` owns the blocking Qt event loop.
 
 from __future__ import annotations
 
+import importlib.util
 import sys
 from typing import Optional
 
 from PyQt6 import QtWidgets
 
+from src.audio.pipeline import SpeechPipeline
+from src.audio.stt import create_engine
 from src.config import config
 from src.core.context import RollingContext
 from src.core.controller import Controller
 from src.core.hotkeys import HotkeyManager
 from src.helpers.logger import get_logger
 from src.llm.claude import ClaudeClient
-from src.models.enums import Mode
+from src.models.enums import Mode, SttEngine
 from src.ui.overlay import Overlay
 
 logger = get_logger(__name__)
@@ -68,6 +71,33 @@ def build_app(*, claude: Optional[ClaudeClient] = None) -> tuple[Overlay, Contro
     return overlay, controller, hotkeys
 
 
+def _maybe_start_speech(controller: Controller) -> Optional[SpeechPipeline]:
+    """Starts live speech capture if the STT backend is available.
+
+    Args:
+        controller (Controller): Receives partial/final speech via its signals.
+
+    Returns:
+        Optional[SpeechPipeline]: The running pipeline, or ``None`` when STT is
+        disabled (backend missing) or the microphone could not be opened.
+    """
+    if config.stt_engine == SttEngine.MLX.value and importlib.util.find_spec("mlx_whisper") is None:
+        logger.warning("STT disabled: run `pip install mlx-whisper` to enable live speech")
+        return None
+    try:
+        pipeline = SpeechPipeline(
+            create_engine(),
+            on_partial_text=controller.partial_speech.emit,
+            on_final_text=controller.final_speech.emit,
+        )
+        pipeline.start()
+        logger.info("Live STT active (engine=%s)", config.stt_engine)
+        return pipeline
+    except Exception:  # pylint: disable=broad-exception-caught
+        logger.exception("Could not start live STT (microphone permission?)")
+        return None
+
+
 def main() -> int:  # pragma: no cover - launches the blocking Qt event loop
     """Builds the app, starts hotkeys and runs the Qt event loop."""
     logger.info("Starting sufler")
@@ -82,9 +112,12 @@ def main() -> int:  # pragma: no cover - launches the blocking Qt event loop
 
     overlay.show()
     overlay.arm_auto_hide()
+    pipeline = _maybe_start_speech(controller)
     try:
         return app.exec()
     finally:
+        if pipeline is not None:
+            pipeline.stop()
         hotkeys.stop()
         logger.info("sufler shutting down")
 

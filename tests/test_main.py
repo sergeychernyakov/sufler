@@ -31,3 +31,35 @@ def test_build_app_uses_injected_claude(qtbot) -> None:
 
     # The injected client is the one the controller will stream from.
     assert controller._claude is fake_claude  # noqa: SLF001  (white-box wiring check)
+
+
+def test_maybe_start_speech_disabled_without_mlx() -> None:
+    # mlx_whisper is not installed in the test environment -> STT is disabled.
+    from main import _maybe_start_speech
+
+    assert _maybe_start_speech(MagicMock()) is None
+
+
+def test_maybe_start_speech_starts_pipeline(monkeypatch) -> None:
+    import main as main_module
+
+    monkeypatch.setattr(main_module.importlib.util, "find_spec", lambda name: object())
+    monkeypatch.setattr(main_module, "create_engine", lambda *a, **k: MagicMock())
+    started: dict[str, bool] = {}
+
+    class _FakePipeline:
+        def __init__(self, engine, *, on_partial_text, on_final_text) -> None:
+            started["init"] = True
+
+        def start(self) -> None:
+            started["start"] = True
+
+        def stop(self) -> None:
+            started["stop"] = True
+
+    monkeypatch.setattr(main_module, "SpeechPipeline", _FakePipeline)
+
+    pipeline = main_module._maybe_start_speech(MagicMock())
+
+    assert started.get("start") is True
+    assert pipeline is not None
