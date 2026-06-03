@@ -217,3 +217,25 @@ def test_on_input_volume_changed_forwards_to_setter() -> None:
     )
     controller.on_input_volume_changed(42)
     assert calls == [42]
+
+
+def test_final_speech_auto_answers_when_enabled() -> None:
+    controller, _, claude, _ = _make()  # auto_answer defaults on
+    controller.final_speech.emit("что такое REST?")
+    assert claude.calls and "REST" in claude.calls[0]["question"]
+
+
+def test_final_speech_does_not_answer_when_auto_off() -> None:
+    overlay = _FakeOverlay()
+    claude = _FakeClaude(["a"])
+    controller = Controller(overlay, claude, RollingContext(), runner=lambda w: w(), auto_answer=False)
+    controller.final_speech.emit("что такое REST?")
+    assert claude.calls == []
+
+
+def test_set_auto_answer_toggles_flag() -> None:
+    controller, _, _, _ = _make()
+    controller.set_auto_answer(False)
+    assert controller.auto_answer is False
+    controller.set_auto_answer(True)
+    assert controller.auto_answer is True
