@@ -55,4 +55,8 @@ def create_answer_client(provider: Optional[str] = None) -> AnswerClient:
         from src.llm.gemini import GeminiClient  # pylint: disable=import-outside-toplevel
 
         return GeminiClient()
-    raise ValueError(f"Unknown LLM provider {selected!r}. Valid options are: claude, gemini.")
+    if selected == "groq":
+        from src.llm.groq import GroqClient  # pylint: disable=import-outside-toplevel
+
+        return GroqClient()
+    raise ValueError(f"Unknown LLM provider {selected!r}. Valid options are: claude, gemini, groq.")

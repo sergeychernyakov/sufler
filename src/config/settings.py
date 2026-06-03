@@ -38,6 +38,10 @@ class Config:
     llm_provider: str = field(default_factory=lambda: os.getenv("SUFLER_LLM_PROVIDER", "claude"))
     gemini_api_key: str = field(default_factory=lambda: os.getenv("SUFLER_GEMINI_API_KEY", ""))
     gemini_model: str = field(default_factory=lambda: os.getenv("SUFLER_GEMINI_MODEL", "gemini-2.0-flash"))
+    groq_api_key: str = field(default_factory=lambda: os.getenv("SUFLER_GROQ_API_KEY", ""))
+    groq_model: str = field(
+        default_factory=lambda: os.getenv("SUFLER_GROQ_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
+    )
 
     # Speech-to-text (Phase 5+)
     stt_engine: str = field(default_factory=lambda: os.getenv("SUFLER_STT_ENGINE", "mlx"))
