@@ -89,6 +89,9 @@ class Controller(QObject):
         self._set_input_volume = set_input_volume
         self.auto_answer = auto_answer
         self._speech: Optional[SpeechControl] = None
+        #: Drill-down history: (question, raw answer) of screens we can go back to.
+        self._nav_stack: list[tuple[str, str]] = []
+        self._current_question: str = ""
         self.answer_token.connect(self._overlay.append_answer)
         self.partial_speech.connect(self._on_partial_speech)
         self.final_speech.connect(self._on_final_speech)
@@ -104,6 +107,7 @@ class Controller(QObject):
         image_b64 = self._capture_screenshot()
         self._context.set_screenshot(image_b64)
         self._overlay.set_question("📸 Скриншот экрана")
+        self._set_root("📸 Скриншот экрана")
         self._start_stream(CAPTURE_PROMPT, image_b64=image_b64)
 
     def on_submit_text(self, text: str) -> None:
@@ -114,6 +118,7 @@ class Controller(QObject):
         logger.info("on_submit_text (%d chars)", len(question))
         self._context.set_question(question)
         self._overlay.set_question(question)
+        self._set_root(question)
         self._start_stream(question, image_b64=None)
 
     def on_answer_last(self) -> None:
@@ -124,6 +129,7 @@ class Controller(QObject):
             self._overlay.set_question("(нет распознанной речи)")
             return
         self._overlay.set_question(question)
+        self._set_root(question)
         self._start_stream(question, image_b64=None)
 
     def panic(self) -> None:
@@ -134,6 +140,40 @@ class Controller(QObject):
         """Switch the answer mode and reflect it in the overlay."""
         self.mode = mode
         self._overlay.set_mode(mode)
+
+    def on_term_clicked(self, term: str) -> None:
+        """Drill-down: answer a clicked term, pushing the current screen onto the back stack.
+
+        Args:
+            term (str): The bold phrase clicked in the current answer.
+        """
+        term = term.strip()
+        if not term:
+            return
+        logger.info("on_term_clicked: %r", term)
+        self._nav_stack.append((self._current_question, self._overlay.answer_raw()))
+        question = f"Расскажи подробнее про: {term}"
+        self._current_question = question
+        self._context.set_question(question)
+        self._overlay.set_question(question)
+        self._overlay.set_back_visible(True)
+        self._start_stream(question, image_b64=None)
+
+    def on_back(self) -> None:
+        """Navigate back to the previous answer (restores it without re-querying)."""
+        if not self._nav_stack:
+            return
+        question, answer_raw = self._nav_stack.pop()
+        self._current_question = question
+        self._overlay.set_question(question)
+        self._overlay.show_answer(answer_raw)
+        self._overlay.set_back_visible(bool(self._nav_stack))
+
+    def _set_root(self, question: str) -> None:
+        """Begins a fresh answer thread, clearing drill-down history."""
+        self._current_question = question
+        self._nav_stack.clear()
+        self._overlay.set_back_visible(False)
 
     def set_speech_pipeline(self, pipeline: SpeechControl) -> None:
         """Attaches the live-speech pipeline so the mic toggle can pause/resume it.
@@ -182,6 +222,7 @@ class Controller(QObject):
         self._overlay.set_question(text)
         self._overlay.append_transcript(text)
         if self.auto_answer:
+            self._set_root(text)
             self._start_stream(text, image_b64=None)
 
     # ------------------------------------------------------------------ #

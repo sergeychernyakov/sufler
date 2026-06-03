@@ -17,6 +17,8 @@ class _FakeOverlay:
         self.answer_tokens: list[str] = []
         self.transcript: list[str] = []
         self.levels: list[float] = []
+        self.shown_answers: list[str] = []
+        self.back_visible = False
         self.begun = 0
         self.ended = 0
         self.hidden = 0
@@ -41,6 +43,15 @@ class _FakeOverlay:
 
     def set_input_level(self, level: float) -> None:
         self.levels.append(level)
+
+    def set_back_visible(self, visible: bool) -> None:
+        self.back_visible = visible
+
+    def answer_raw(self) -> str:
+        return "".join(self.answer_tokens)
+
+    def show_answer(self, raw: str) -> None:
+        self.shown_answers.append(raw)
 
     def hide(self) -> None:
         self.hidden += 1
@@ -231,3 +242,36 @@ def test_final_speech_does_not_answer_when_auto_off() -> None:
     controller = Controller(overlay, claude, RollingContext(), runner=lambda w: w(), auto_answer=False)
     controller.final_speech.emit("что такое REST?")
     assert claude.calls == []
+
+
+def test_term_click_drills_down_and_shows_back() -> None:
+    controller, overlay, claude, _ = _make()
+    controller.on_submit_text("Расскажи про Rails")
+    controller.on_term_clicked("Active Record")
+    assert "Active Record" in claude.calls[-1]["question"]
+    assert overlay.back_visible is True
+
+
+def test_back_restores_previous_answer() -> None:
+    controller, overlay, _, _ = _make()
+    controller.on_submit_text("Расскажи про Rails")  # answer tokens -> "ab"
+    controller.on_term_clicked("Active Record")
+    controller.on_back()
+    assert overlay.shown_answers[-1] == "ab"
+    assert overlay.back_visible is False
+
+
+def test_back_without_history_is_noop() -> None:
+    controller, overlay, _, _ = _make()
+    controller.on_back()
+    assert overlay.shown_answers == []
+
+
+def test_new_question_clears_drill_history() -> None:
+    controller, overlay, _, _ = _make()
+    controller.on_submit_text("Q1")
+    controller.on_term_clicked("term")  # back becomes visible
+    controller.on_submit_text("Q2")  # new root clears history
+    assert overlay.back_visible is False
+    controller.on_back()  # nothing to restore
+    assert overlay.shown_answers == []

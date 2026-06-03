@@ -15,9 +15,11 @@ visually.
 
 from __future__ import annotations
 
+import html
 import re
 import sys
 from typing import Final
+from urllib.parse import quote, unquote
 
 # PyQt6 ships compiled C extensions that pylint cannot introspect statically,
 # so it falsely reports missing names/members. Static type checking is handled
@@ -137,6 +139,8 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
     text_submitted = pyqtSignal(str)
     mic_toggled = pyqtSignal(bool)
     input_volume_changed = pyqtSignal(int)
+    term_activated = pyqtSignal(str)
+    back_requested = pyqtSignal()
 
     def __init__(self, parent: QtWidgets.QWidget | None = None, *, stealth: bool = False) -> None:
         """Builds the overlay window and lays out widgets.
@@ -163,6 +167,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
 
         # "Thinking" spinner shown in the answer area until the first LLM token arrives.
         self._got_answer_token: bool = False
+        self._answer_raw: str = ""
         self._thinking_frame: int = 0
         self._thinking_timer = QtCore.QTimer(self)
         self._thinking_timer.timeout.connect(self._on_thinking_tick)
@@ -293,8 +298,17 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._answer_label.setObjectName("answerLabel")
         self._answer_label.setWordWrap(True)
         self._answer_label.setTextFormat(Qt.TextFormat.PlainText)
-        self._answer_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self._answer_label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.LinksAccessibleByMouse
+        )
+        self._answer_label.setOpenExternalLinks(False)
         self._answer_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+
+        self._back_button = QtWidgets.QPushButton("←", self)
+        self._back_button.setObjectName("backButton")
+        self._back_button.setToolTip("Назад к предыдущему ответу")
+        self._back_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._back_button.hide()
 
         self._capture_button = QtWidgets.QPushButton(self)
         self._capture_button.setObjectName("captureButton")
@@ -359,6 +373,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
 
         controls = QtWidgets.QHBoxLayout()
         controls.setSpacing(6)
+        controls.addWidget(self._back_button)
         controls.addWidget(self._capture_button)
         controls.addWidget(self._mic_button)
         controls.addWidget(self._input_field, stretch=1)
@@ -381,6 +396,8 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
 
     def _connect_signals(self) -> None:
         """Wires child-widget signals to the overlay's public signals."""
+        self._back_button.clicked.connect(self.back_requested)
+        self._answer_label.linkActivated.connect(self._on_answer_link)
         self._capture_button.clicked.connect(self._on_capture_clicked)
         self._mic_button.clicked.connect(self._on_mic_clicked)
         self._input_field.returnPressed.connect(self._on_input_submitted)
@@ -466,14 +483,15 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
                 color: #f2f2f2;
                 font-size: 13px;
             }
-            QPushButton#captureButton, QPushButton#sendButton, QPushButton#micButton {
+            QPushButton#captureButton, QPushButton#sendButton, QPushButton#micButton, QPushButton#backButton {
                 background-color: rgba(60, 60, 70, 230);
                 border: 1px solid rgba(120, 120, 140, 200);
                 border-radius: 6px;
                 padding: 4px 10px;
                 font-size: 15px;
             }
-            QPushButton#captureButton:hover, QPushButton#sendButton:hover, QPushButton#micButton:hover {
+            QPushButton#captureButton:hover, QPushButton#sendButton:hover,
+            QPushButton#micButton:hover, QPushButton#backButton:hover {
                 background-color: rgba(80, 80, 92, 240);
             }
             QPushButton#micButton:checked {
@@ -608,37 +626,102 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         """Clears the answer area and starts the 'thinking' spinner (until the first token)."""
         self._answer_label.clear()
         self._got_answer_token = False
+        self._answer_raw = ""
         self._thinking_frame = 0
         self._thinking_timer.start(110)
 
     def append_answer(self, token: str) -> None:
-        """Appends a streamed token, replacing the 'thinking' spinner on the first one.
+        """Appends a streamed token (plain text), replacing the spinner on the first one.
 
         Args:
             token (str): The next token (or chunk) of the answer to append.
         """
         if not self._got_answer_token:
             self._thinking_timer.stop()
-            self._answer_label.clear()
             self._got_answer_token = True
-        self._answer_label.setText(self._answer_label.text() + token)
+            self._answer_raw = ""
+        self._answer_raw += token
+        self._answer_label.setTextFormat(Qt.TextFormat.PlainText)
+        self._answer_label.setText(self._answer_raw)
 
     def end_answer(self) -> None:
-        """Ends a streamed answer: stops the spinner and notes an empty response."""
+        """Ends a streamed answer: stops the spinner and renders **terms** as clickable links."""
         self._thinking_timer.stop()
         if not self._got_answer_token:
+            self._answer_label.setTextFormat(Qt.TextFormat.PlainText)
             self._answer_label.setText("(пустой ответ)")
+            return
+        self._render_answer(self._answer_raw)
+
+    def show_answer(self, raw: str) -> None:
+        """Displays a finished answer (e.g. when navigating back), with clickable terms.
+
+        Args:
+            raw (str): The raw answer markdown to render.
+        """
+        self._thinking_timer.stop()
+        self._got_answer_token = True
+        self._render_answer(raw)
+
+    def answer_raw(self) -> str:
+        """Returns the raw (markdown) text of the current answer.
+
+        Returns:
+            str: The accumulated answer markdown (with ``**term**`` markers).
+        """
+        return self._answer_raw
+
+    def set_back_visible(self, visible: bool) -> None:
+        """Shows or hides the navigation back ("←") button.
+
+        Args:
+            visible (bool): ``True`` to show the back button.
+        """
+        self._back_button.setVisible(visible)
+
+    def _render_answer(self, raw: str) -> None:
+        """Stores ``raw`` and renders it as rich text with clickable ``**term**`` links."""
+        self._answer_raw = raw
+        self._answer_label.setTextFormat(Qt.TextFormat.RichText)
+        self._answer_label.setText(self._linkify(raw))
+
+    @staticmethod
+    def _linkify(raw: str) -> str:
+        """Renders answer markdown to HTML, turning each ``**term**`` into a clickable link.
+
+        Args:
+            raw (str): The raw answer text.
+
+        Returns:
+            str: HTML where every ``**term**`` is an ``<a href="term:...">`` link, other
+            text is HTML-escaped and newlines become ``<br>``.
+        """
+        out: list[str] = []
+        last = 0
+        for match in re.finditer(r"\*\*(.+?)\*\*", raw):
+            out.append(html.escape(raw[last : match.start()]))
+            term = match.group(1).strip()
+            out.append(f'<a href="term:{quote(term)}" style="color:#9ad1ff;">{html.escape(term)}</a>')
+            last = match.end()
+        out.append(html.escape(raw[last:]))
+        return "".join(out).replace("\n", "<br>")
+
+    def _on_answer_link(self, href: str) -> None:
+        """Emits :pyattr:`term_activated` when a ``**term**`` link in the answer is clicked."""
+        if href.startswith("term:"):
+            self.term_activated.emit(unquote(href[len("term:") :]))
 
     def _on_thinking_tick(self) -> None:
         """Advances the 'thinking' spinner shown before the first answer token arrives."""
         self._thinking_frame = (self._thinking_frame + 1) % len(_SPINNER_FRAMES)
+        self._answer_label.setTextFormat(Qt.TextFormat.PlainText)
         self._answer_label.setText(f"{_SPINNER_FRAMES[self._thinking_frame]}  думаю…")
 
     def answer_text(self) -> str:
-        """Returns the full answer accumulated so far.
+        """Returns the text currently shown in the answer area.
 
         Returns:
-            str: The text shown in the answer area.
+            str: The answer label's text (raw during streaming; HTML once rendered).
         """
         return self._answer_label.text()
 
