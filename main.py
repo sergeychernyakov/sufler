@@ -25,7 +25,7 @@ from src.core.context import RollingContext
 from src.core.controller import Controller
 from src.core.hotkeys import HotkeyManager
 from src.helpers.logger import get_logger
-from src.llm.claude import ClaudeClient
+from src.llm.factory import AnswerClient, create_answer_client
 from src.models.enums import Mode, SttEngine
 from src.ui.overlay import Overlay
 
@@ -45,21 +45,24 @@ def _resolve_mode() -> Mode:
         return Mode.COACH
 
 
-def build_app(*, claude: Optional[ClaudeClient] = None) -> tuple[Overlay, Controller, HotkeyManager]:
+def build_app(*, claude: Optional[AnswerClient] = None) -> tuple[Overlay, Controller, HotkeyManager]:
     """Constructs and wires every component without starting the event loop.
 
     Args:
-        claude (Optional[ClaudeClient]): Injected client (tests); defaults to a
-            real :class:`ClaudeClient` built from configuration.
+        claude (Optional[AnswerClient]): Injected client (tests); defaults to the
+            configured answer client (provider via ``SUFLER_LLM_PROVIDER``).
 
     Returns:
         tuple[Overlay, Controller, HotkeyManager]: The wired top-level objects.
     """
-    if not config.anthropic_api_key:
-        logger.warning("ANTHROPIC_API_KEY is empty — captures will fail until it is set in .env")
+    if config.llm_provider.strip().lower() == "gemini":
+        if not config.gemini_api_key:
+            logger.warning("SUFLER_GEMINI_API_KEY is empty — answers will fail until it is set in .env")
+    elif not config.anthropic_api_key:
+        logger.warning("ANTHROPIC_API_KEY is empty — answers will fail until it is set in .env")
 
     overlay = Overlay(stealth=config.stealth)
-    claude_client = claude or ClaudeClient(api_key=config.anthropic_api_key or "MISSING_API_KEY")
+    claude_client = claude or create_answer_client()
     context = RollingContext()
     controller = Controller(overlay, claude_client, context, mode=_resolve_mode())
 

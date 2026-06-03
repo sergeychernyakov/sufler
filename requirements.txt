@@ -16,8 +16,9 @@ mss>=9.0
 # Global hotkeys
 pynput>=1.7
 
-# LLM (Claude)
-anthropic>=0.40
+# LLM — answer backends (selected via SUFLER_LLM_PROVIDER)
+anthropic>=0.40                  # provider "claude" (Anthropic, paid)
+langchain-google-genai>=2.0      # provider "gemini" (Google, free tier; vision + streaming)
 
 # Config / models
 python-dotenv>=1.0

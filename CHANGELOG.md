@@ -25,6 +25,10 @@ line under `[Unreleased]`**.
   to zero. System volume is read/set via `osascript`. _feat(ui)_
 - **Font zoom** — `Cmd +` / `Cmd =` enlarge and `Cmd -` shrink the overlay text, `Cmd 0` resets
   (all fonts scale 0.7×–2.5×). _feat(ui)_
+- **Gemini answer backend (free tier)** — `SUFLER_LLM_PROVIDER=claude|gemini` selects the answer
+  LLM via a provider-agnostic factory. Gemini (`langchain-google-genai`) streams answers and reads
+  screenshots, mirroring the Claude client; configured via `SUFLER_GEMINI_API_KEY` /
+  `SUFLER_GEMINI_MODEL`. _feat(llm)_
 
 ### Fixed
 - **App icon transparency** — the source icon was flattened to RGB, so its corners rendered as
