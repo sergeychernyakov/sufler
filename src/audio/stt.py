@@ -200,6 +200,8 @@ def create_engine(engine: SttEngine | str | None = None, **kwargs: Any) -> STTEn
     logger.info("Creating STT engine: %s", selected.value)
 
     if selected is SttEngine.MLX:
+        if "model" not in kwargs and config.stt_model:
+            kwargs["model"] = config.stt_model
         return MlxWhisperEngine(**kwargs)
     if selected is SttEngine.DEEPGRAM:
         return DeepgramEngine(**kwargs)

@@ -63,7 +63,7 @@ main.py                    # есть — точка входа: собрать 
 
 Поверхность настроек (см. `.env.example`): `ANTHROPIC_API_KEY`, `SUFLER_MODEL`,
 `SUFLER_MODE` (coach|answer), `SUFLER_ANSWER_LANG`, `SUFLER_STT_ENGINE`
-(mlx|whispercpp|deepgram), хоткеи `SUFLER_HOTKEY_*`. Никаких ключей в коде.
+(mlx|whispercpp|deepgram), `SUFLER_STT_MODEL`, хоткеи `SUFLER_HOTKEY_*`. Никаких ключей в коде.
 
 ---
 

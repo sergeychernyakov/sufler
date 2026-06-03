@@ -258,3 +258,45 @@ def test_deepgram_transcribe_raises_not_implemented() -> None:
     # Act / Assert
     with pytest.raises(NotImplementedError, match="Deepgram"):
         engine.transcribe(_fake_audio())
+
+
+# --------------------------------------------------------------------------- #
+# create_engine — model from config (SUFLER_STT_MODEL)
+# --------------------------------------------------------------------------- #
+def test_create_engine_mlx_uses_configured_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``config.stt_model`` is passed to the MLX engine when set."""
+    # Arrange
+    monkeypatch.setattr(stt.config, "stt_model", "mlx-community/whisper-small")
+
+    # Act
+    engine = create_engine(SttEngine.MLX)
+
+    # Assert
+    assert isinstance(engine, MlxWhisperEngine)
+    assert engine.model == "mlx-community/whisper-small"
+
+
+def test_create_engine_explicit_model_overrides_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An explicit ``model=`` kwarg wins over ``config.stt_model``."""
+    # Arrange
+    monkeypatch.setattr(stt.config, "stt_model", "mlx-community/whisper-small")
+
+    # Act
+    engine = create_engine(SttEngine.MLX, model="custom/model")
+
+    # Assert
+    assert isinstance(engine, MlxWhisperEngine)
+    assert engine.model == "custom/model"
+
+
+def test_create_engine_mlx_falls_back_to_default_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With ``config.stt_model`` empty, the engine keeps its built-in default."""
+    # Arrange
+    monkeypatch.setattr(stt.config, "stt_model", "")
+
+    # Act
+    engine = create_engine(SttEngine.MLX)
+
+    # Assert
+    assert isinstance(engine, MlxWhisperEngine)
+    assert engine.model == DEFAULT_MLX_MODEL
