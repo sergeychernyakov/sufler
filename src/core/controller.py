@@ -38,6 +38,8 @@ class Controller(QObject):
     """Orchestrates input → (screenshot) → context → Claude → overlay streaming."""
 
     answer_token = pyqtSignal(str)
+    partial_speech = pyqtSignal(str)
+    final_speech = pyqtSignal(str)
 
     def __init__(
         self,
@@ -71,6 +73,8 @@ class Controller(QObject):
         self._runner: Runner = runner or self._spawn_thread
         self._hide_delay = hide_delay
         self.answer_token.connect(self._overlay.append_answer)
+        self.partial_speech.connect(self._on_partial_speech)
+        self.final_speech.connect(self._on_final_speech)
 
     # ------------------------------------------------------------------ #
     # Entry points (the single "on_capture" surface from the spec)
@@ -111,6 +115,19 @@ class Controller(QObject):
         """Switch the answer mode and reflect it in the overlay."""
         self.mode = mode
         self._overlay.set_mode(mode)
+
+    # ------------------------------------------------------------------ #
+    # Live speech (STT) slots — invoked on the UI thread via signals
+    # ------------------------------------------------------------------ #
+    def _on_partial_speech(self, text: str) -> None:
+        """Shows live (draft) recognised speech in the question field."""
+        self._overlay.set_question(text)
+
+    def _on_final_speech(self, text: str) -> None:
+        """Records a finalised utterance into the rolling context."""
+        self._context.add_speech(text)
+        self._context.set_question(text)
+        self._overlay.set_question(text)
 
     # ------------------------------------------------------------------ #
     # Internals

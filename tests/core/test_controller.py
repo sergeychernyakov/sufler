@@ -145,3 +145,17 @@ def test_claude_error_emits_error_token() -> None:
     )
     controller.on_submit_text("hi")
     assert any("ошибка" in tok for tok in overlay.answer_tokens)
+
+
+def test_partial_speech_shows_draft_question() -> None:
+    controller, overlay, _, _ = _make()
+    controller.partial_speech.emit("черновик вопроса")
+    assert overlay.questions[-1] == "черновик вопроса"
+
+
+def test_final_speech_records_into_context() -> None:
+    controller, overlay, _, context = _make()
+    controller.final_speech.emit("расскажи про сборщик мусора")
+    assert context.last_question() == "расскажи про сборщик мусора"
+    assert "сборщик" in context.recent_speech()
+    assert overlay.questions[-1] == "расскажи про сборщик мусора"
