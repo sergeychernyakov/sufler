@@ -61,13 +61,16 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
     and the public setter/streaming methods.
 
     Signals:
-        capture_requested: Emitted when the "📸 Скрин" button is pressed.
+        capture_requested: Emitted when the capture (camera) button is pressed.
         text_submitted (str): Emitted with the (non-empty) manual input text
             when the user presses Enter in the input field.
+        mic_toggled (bool): Emitted when the user toggles the microphone button —
+            ``True`` to start listening, ``False`` to mute.
     """
 
     capture_requested = pyqtSignal()
     text_submitted = pyqtSignal(str)
+    mic_toggled = pyqtSignal(bool)
 
     def __init__(self, parent: QtWidgets.QWidget | None = None, *, stealth: bool = False) -> None:
         """Builds the overlay window and lays out widgets.
@@ -153,6 +156,45 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         painter.end()
         return QtGui.QIcon(pix)
 
+    @staticmethod
+    def _mic_icon(active: bool) -> QtGui.QIcon:
+        """Draws a microphone icon, visibly distinct for the on/off states.
+
+        Args:
+            active (bool): ``True`` draws a filled green "listening" microphone;
+                ``False`` draws a dimmed, outlined microphone with a diagonal
+                "muted" slash.
+
+        Returns:
+            QtGui.QIcon: A crisp vector microphone icon for the mic toggle button.
+        """
+        size = 24
+        pix = QtGui.QPixmap(size, size)
+        pix.fill(Qt.GlobalColor.transparent)
+        painter = QtGui.QPainter(pix)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
+        color = QtGui.QColor("#5ed16a" if active else "#8a8a90")
+        pen = QtGui.QPen(color, 1.6)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(pen)
+        # Mic capsule (head): filled when listening, hollow when muted.
+        if active:
+            painter.setBrush(color)
+        else:
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(QtCore.QRectF(9.0, 3.0, 6.0, 11.0), 3.0, 3.0)
+        # Cradle (the U the capsule sits in) + stand + base.
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawArc(QtCore.QRectF(6.0, 5.5, 12.0, 12.0), 180 * 16, 180 * 16)
+        painter.drawLine(QtCore.QPointF(12.0, 17.5), QtCore.QPointF(12.0, 20.5))
+        painter.drawLine(QtCore.QPointF(8.5, 20.5), QtCore.QPointF(15.5, 20.5))
+        if not active:
+            # Diagonal slash marks the muted state.
+            painter.drawLine(QtCore.QPointF(5.0, 4.5), QtCore.QPointF(19.0, 19.5))
+        painter.end()
+        return QtGui.QIcon(pix)
+
     def _build_widgets(self) -> None:
         """Creates the child widgets (labels, button, input)."""
         self._question_label = QtWidgets.QLabel("", self)
@@ -173,6 +215,15 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._capture_button.setIconSize(QtCore.QSize(20, 20))
         self._capture_button.setToolTip("Скриншот экрана → Claude")
         self._capture_button.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        # Microphone toggle: listening (on) by default; icon differs per state.
+        self._mic_button = QtWidgets.QPushButton(self)
+        self._mic_button.setObjectName("micButton")
+        self._mic_button.setCheckable(True)
+        self._mic_button.setChecked(True)
+        self._mic_button.setIconSize(QtCore.QSize(20, 20))
+        self._mic_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._update_mic_visuals()
 
         self._input_field = QtWidgets.QLineEdit(self)
         self._input_field.setObjectName("inputField")
@@ -208,6 +259,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         controls = QtWidgets.QHBoxLayout()
         controls.setSpacing(6)
         controls.addWidget(self._capture_button)
+        controls.addWidget(self._mic_button)
         controls.addWidget(self._input_field, stretch=1)
         controls.addWidget(self._send_button)
         layout.addLayout(controls)
@@ -216,6 +268,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
     def _connect_signals(self) -> None:
         """Wires child-widget signals to the overlay's public signals."""
         self._capture_button.clicked.connect(self._on_capture_clicked)
+        self._mic_button.clicked.connect(self._on_mic_clicked)
         self._input_field.returnPressed.connect(self._on_input_submitted)
         self._send_button.clicked.connect(self._on_input_submitted)
         self._transcript_toggle.toggled.connect(self.set_transcript_visible)
@@ -243,15 +296,19 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
                 color: #f2f2f2;
                 font-size: 13px;
             }
-            QPushButton#captureButton, QPushButton#sendButton {
+            QPushButton#captureButton, QPushButton#sendButton, QPushButton#micButton {
                 background-color: rgba(60, 60, 70, 230);
                 border: 1px solid rgba(120, 120, 140, 200);
                 border-radius: 6px;
                 padding: 4px 10px;
                 font-size: 15px;
             }
-            QPushButton#captureButton:hover, QPushButton#sendButton:hover {
+            QPushButton#captureButton:hover, QPushButton#sendButton:hover, QPushButton#micButton:hover {
                 background-color: rgba(80, 80, 92, 240);
+            }
+            QPushButton#micButton:checked {
+                background-color: rgba(36, 78, 44, 235);
+                border-color: rgba(110, 200, 130, 200);
             }
             QLineEdit#inputField {
                 background-color: rgba(40, 40, 48, 230);
@@ -289,6 +346,24 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         logger.debug("Manual text submitted (%d chars)", len(text))
         self._input_field.clear()
         self.text_submitted.emit(text)
+
+    def _on_mic_clicked(self, listening: bool) -> None:
+        """Updates the mic icon/tooltip and re-emits the toggle as :pyattr:`mic_toggled`.
+
+        Args:
+            listening (bool): The button's new checked state (``True`` = listening).
+        """
+        self._update_mic_visuals()
+        logger.debug("Microphone %s by user", "enabled" if listening else "disabled")
+        self.mic_toggled.emit(listening)
+
+    def _update_mic_visuals(self) -> None:
+        """Syncs the mic button icon and tooltip to its checked (listening) state."""
+        listening = self._mic_button.isChecked()
+        self._mic_button.setIcon(self._mic_icon(listening))
+        self._mic_button.setToolTip(
+            "Слушаю — нажмите, чтобы выключить микрофон" if listening else "Микрофон выключен — нажмите, чтобы слушать"
+        )
 
     # ------------------------------------------------------------------ #
     # Content API
@@ -359,6 +434,46 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
             bool: ``True`` if the transcript area is visible.
         """
         return self._transcript.isVisible()
+
+    # ------------------------------------------------------------------ #
+    # Microphone (listening) control
+    # ------------------------------------------------------------------ #
+    def set_listening(self, listening: bool) -> None:
+        """Reflects the real capture state on the mic button (no signal emitted).
+
+        Updates the button, icon and tooltip only — it does **not** emit
+        :pyattr:`mic_toggled` — so it is safe for syncing the UI to the actual
+        pipeline state (e.g. at startup).
+
+        Args:
+            listening (bool): ``True`` shows the listening icon; ``False`` the muted icon.
+        """
+        self._mic_button.setChecked(listening)
+        self._update_mic_visuals()
+
+    def is_listening(self) -> bool:
+        """Returns whether the mic toggle is in the listening (on) state.
+
+        Returns:
+            bool: ``True`` when listening is enabled.
+        """
+        return self._mic_button.isChecked()
+
+    def set_mic_enabled(self, enabled: bool) -> None:
+        """Enables/disables the mic toggle (disable when speech capture is unavailable).
+
+        A disabled toggle is forced to the muted state and explains why via its tooltip.
+
+        Args:
+            enabled (bool): ``True`` to let the user toggle listening on/off.
+        """
+        self._mic_button.setEnabled(enabled)
+        if enabled:
+            self._update_mic_visuals()
+            return
+        self._mic_button.setChecked(False)
+        self._mic_button.setIcon(self._mic_icon(False))
+        self._mic_button.setToolTip("Распознавание речи недоступно")
 
     # ------------------------------------------------------------------ #
     # Stealth controls

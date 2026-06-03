@@ -163,3 +163,29 @@ def test_final_speech_records_into_context() -> None:
     assert context.last_question() == "расскажи про сборщик мусора"
     assert "сборщик" in context.recent_speech()
     assert overlay.questions[-1] == "расскажи про сборщик мусора"
+
+
+class _FakePipeline:
+    """Records set_listening calls so the mic-toggle wiring can be asserted."""
+
+    def __init__(self) -> None:
+        self.calls: list[bool] = []
+
+    def set_listening(self, listening: bool) -> None:
+        self.calls.append(listening)
+
+
+def test_on_mic_toggled_forwards_to_attached_pipeline() -> None:
+    controller, _, _, _ = _make()
+    pipeline = _FakePipeline()
+    controller.set_speech_pipeline(pipeline)
+
+    controller.on_mic_toggled(False)
+    controller.on_mic_toggled(True)
+
+    assert pipeline.calls == [False, True]
+
+
+def test_on_mic_toggled_without_pipeline_is_noop() -> None:
+    controller, _, _, _ = _make()
+    controller.on_mic_toggled(False)  # no pipeline attached -> must not raise

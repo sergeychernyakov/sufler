@@ -64,6 +64,7 @@ def build_app(*, claude: Optional[ClaudeClient] = None) -> tuple[Overlay, Contro
 
     overlay.capture_requested.connect(controller.on_capture)
     overlay.text_submitted.connect(controller.on_submit_text)
+    overlay.mic_toggled.connect(controller.on_mic_toggled)
 
     hotkeys = HotkeyManager(
         capture_hotkey=config.hotkey_capture,
@@ -141,6 +142,11 @@ def main() -> int:  # pragma: no cover - launches the blocking Qt event loop
     overlay.show()
     overlay.raise_()
     pipeline = _maybe_start_speech(controller)
+    if pipeline is not None:
+        controller.set_speech_pipeline(pipeline)
+        overlay.set_listening(True)
+    else:
+        overlay.set_mic_enabled(False)
     try:
         return app.exec()
     finally:

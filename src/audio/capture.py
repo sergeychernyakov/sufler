@@ -125,7 +125,11 @@ class MicrophoneCapture:  # pylint: disable=too-many-instance-attributes
         opened as mono float32 at :attr:`sample_rate` on the configured input
         device (the system default when unset); its callback forwards each
         captured block to :meth:`_ingest`.
+
+        Any segmentation state left over from a previous session is cleared first,
+        so resuming after a pause never merges a stale half-utterance into the new one.
         """
+        self._reset()
         import sounddevice as sd  # pylint: disable=import-outside-toplevel
 
         stream = sd.InputStream(

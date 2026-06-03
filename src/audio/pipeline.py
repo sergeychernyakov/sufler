@@ -59,6 +59,7 @@ class SpeechPipeline:
         self._on_final_text = on_final_text
         self._sample_rate = sample_rate
         self._runner: Runner = runner or self._spawn_thread
+        self._listening = False
         self._capture = capture_factory(
             on_partial=self._handle_partial_audio,
             on_final=self._handle_final_audio,
@@ -67,12 +68,41 @@ class SpeechPipeline:
         )
 
     def start(self) -> None:
-        """Starts listening to the microphone."""
+        """Starts listening to the microphone (idempotent)."""
+        if self._listening:
+            return
         self._capture.start()
+        self._listening = True
 
     def stop(self) -> None:
-        """Stops listening to the microphone."""
+        """Stops listening to the microphone (idempotent)."""
+        if not self._listening:
+            return
         self._capture.stop()
+        self._listening = False
+
+    def set_listening(self, listening: bool) -> None:
+        """Resumes or pauses live listening to match ``listening``.
+
+        Pausing closes the input stream, so the operating-system microphone
+        indicator turns off too — an honest "not listening" state.
+
+        Args:
+            listening (bool): ``True`` resumes microphone capture; ``False`` pauses it.
+        """
+        if listening:
+            self.start()
+        else:
+            self.stop()
+
+    @property
+    def is_listening(self) -> bool:
+        """Returns whether the microphone stream is currently open.
+
+        Returns:
+            bool: ``True`` while capturing, ``False`` when paused/stopped.
+        """
+        return self._listening
 
     def _handle_partial_audio(self, audio: np.ndarray) -> None:  # pylint: disable=unused-argument
         """Partials are intentionally not transcribed (finals only).

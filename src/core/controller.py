@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Callable, Optional
+from typing import Callable, Optional, Protocol
 
 from PyQt6 import QtWidgets
 from PyQt6.QtCore import QObject, pyqtSignal
@@ -32,6 +32,13 @@ CAPTURE_PROMPT = "Ответь кратко на вопрос или задач�
 HIDE_BEFORE_CAPTURE_SECONDS = 0.15
 
 Runner = Callable[[Callable[[], None]], None]
+
+
+class SpeechControl(Protocol):  # pylint: disable=too-few-public-methods
+    """Minimal interface for pausing/resuming live speech capture."""
+
+    def set_listening(self, listening: bool) -> None:
+        """Resumes (``True``) or pauses (``False``) live listening."""
 
 
 class Controller(QObject):
@@ -72,6 +79,7 @@ class Controller(QObject):
         self.mode = mode
         self._runner: Runner = runner or self._spawn_thread
         self._hide_delay = hide_delay
+        self._speech: Optional[SpeechControl] = None
         self.answer_token.connect(self._overlay.append_answer)
         self.partial_speech.connect(self._on_partial_speech)
         self.final_speech.connect(self._on_final_speech)
@@ -115,6 +123,26 @@ class Controller(QObject):
         """Switch the answer mode and reflect it in the overlay."""
         self.mode = mode
         self._overlay.set_mode(mode)
+
+    def set_speech_pipeline(self, pipeline: SpeechControl) -> None:
+        """Attaches the live-speech pipeline so the mic toggle can pause/resume it.
+
+        Args:
+            pipeline (SpeechControl): The running speech pipeline (anything exposing
+                ``set_listening``).
+        """
+        self._speech = pipeline
+
+    def on_mic_toggled(self, listening: bool) -> None:
+        """Mic-button entry: pause or resume live speech capture.
+
+        Args:
+            listening (bool): ``True`` resumes listening; ``False`` pauses it. A no-op
+                when no speech pipeline is attached (STT unavailable).
+        """
+        logger.info("Microphone %s", "on" if listening else "off")
+        if self._speech is not None:
+            self._speech.set_listening(listening)
 
     # ------------------------------------------------------------------ #
     # Live speech (STT) slots — invoked on the UI thread via signals
