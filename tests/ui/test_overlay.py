@@ -372,3 +372,19 @@ def test_set_mic_enabled_false_disables_and_mutes(overlay: Overlay) -> None:
     # Act: re-enabling restores an interactive button.
     overlay.set_mic_enabled(True)
     assert overlay._mic_button.isEnabled() is True
+
+
+# --------------------------------------------------------------------------- #
+# Brand title
+# --------------------------------------------------------------------------- #
+def test_window_title_is_capitalized(overlay: Overlay) -> None:
+    """The window title uses the capitalized brand name."""
+    # Assert
+    assert overlay.windowTitle() == "Sufler"
+
+
+def test_header_shows_capitalized_left_aligned_brand(overlay: Overlay) -> None:
+    """The in-window header shows 'Sufler' (capitalized) and is left-aligned."""
+    # Assert
+    assert overlay._header_label.text() == "Sufler"
+    assert bool(overlay._header_label.alignment() & Qt.AlignmentFlag.AlignLeft)

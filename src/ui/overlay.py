@@ -119,7 +119,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         else:
             # Normal window: native title bar (drag + close button), kept on top.
             self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowStaysOnTopHint)
-        self.setWindowTitle("sufler")
+        self.setWindowTitle("Sufler")
         self.resize(400, 340)
         self._move_to_corner()
 
@@ -143,16 +143,28 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         painter = QtGui.QPainter(pix)
         painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
         color = QtGui.QColor("#f2f2f2")
-        painter.setPen(QtGui.QPen(color, 1.6))
+        pen = QtGui.QPen(color, 1.6)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        painter.setPen(pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
-        # Viewfinder bump on top of the body.
-        painter.drawRoundedRect(QtCore.QRectF(8.0, 4.5, 8.0, 4.0), 1.5, 1.5)
+        # Lens-housing hump on top (trapezoid) — sits above the lens, off to the left.
+        hump = QtGui.QPolygonF(
+            [
+                QtCore.QPointF(8.0, 7.5),
+                QtCore.QPointF(9.8, 4.8),
+                QtCore.QPointF(14.2, 4.8),
+                QtCore.QPointF(16.0, 7.5),
+            ]
+        )
+        painter.drawPolygon(hump)
         # Camera body.
-        painter.drawRoundedRect(QtCore.QRectF(2.5, 7.5, 19.0, 13.0), 3.0, 3.0)
-        # Lens: outer ring + filled centre.
-        painter.drawEllipse(QtCore.QPointF(12.0, 14.5), 4.2, 4.2)
+        painter.drawRoundedRect(QtCore.QRectF(2.5, 7.5, 19.0, 12.5), 2.8, 2.8)
+        # Lens: two concentric rings (reads as a camera, not a latch).
+        painter.drawEllipse(QtCore.QPointF(12.0, 14.0), 4.3, 4.3)
+        painter.drawEllipse(QtCore.QPointF(12.0, 14.0), 2.0, 2.0)
+        # Flash: a small filled dot at the top-right of the body.
         painter.setBrush(color)
-        painter.drawEllipse(QtCore.QPointF(12.0, 14.5), 1.6, 1.6)
+        painter.drawEllipse(QtCore.QPointF(18.0, 10.2), 0.85, 0.85)
         painter.end()
         return QtGui.QIcon(pix)
 
@@ -197,6 +209,11 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
 
     def _build_widgets(self) -> None:
         """Creates the child widgets (labels, button, input)."""
+        # Left-aligned brand header (the native macOS title bar always centers its text).
+        self._header_label = QtWidgets.QLabel("Sufler", self)
+        self._header_label.setObjectName("headerLabel")
+        self._header_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+
         self._question_label = QtWidgets.QLabel("", self)
         self._question_label.setObjectName("questionLabel")
         self._question_label.setWordWrap(True)
@@ -252,6 +269,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(6)
+        layout.addWidget(self._header_label)
         layout.addWidget(self._question_label)
         layout.addWidget(self._answer_label, stretch=1)
         layout.addWidget(self._transcript, stretch=1)
@@ -286,6 +304,12 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
                 color: #f2f2f2;
                 font-family: -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif;
                 border-radius: 10px;
+            }
+            QLabel#headerLabel {
+                color: #ffffff;
+                font-size: 14px;
+                font-weight: 700;
+                padding-bottom: 2px;
             }
             QLabel#questionLabel {
                 color: #9ad1ff;

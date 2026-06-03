@@ -17,11 +17,15 @@ line under `[Unreleased]`**.
 - **Configurable STT language** via `SUFLER_STT_LANGUAGE` (empty = auto-detect, best for mixed
   ru+en speech; set `ru` / `en` to pin a single language and drop auto-detection garbage). The
   code default already targets `whisper-large-v3-turbo`. _feat(config)_
+- **Brand shown as "Sufler"** — capitalized window title, a new left-aligned in-window header,
+  and the macOS bundle display name (Dock / ⌘-Tab). _feat(ui)_
 
 ### Fixed
 - **App icon transparency** — the source icon was flattened to RGB, so its corners rendered as
   opaque white in the Dock / app switcher; restored an alpha channel (transparent squircle corners),
   which the bundle and `app.setWindowIcon` now carry through. _fix(ui)_
+- **Capture button icon** now reads as a camera (it looked like a suitcase) — redrawn with a
+  lens-housing hump, concentric lens rings, and a flash dot. _fix(ui)_
 
 ## [0.2.0] - 2026-06-03
 
