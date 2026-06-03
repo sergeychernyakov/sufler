@@ -52,6 +52,58 @@ MOCK_ANSWER_TOKENS: Final[tuple[str, ...]] = (
 )
 
 
+class _LevelMeter(QtWidgets.QWidget):
+    """Horizontal VU-style meter: a row of bars lit in proportion to the input level.
+
+    The level is the peak amplitude (0..1) of the most recent microphone block; a
+    perceptual square-root curve maps it to lit bars so ordinary speech fills a
+    useful range, and the top bars turn amber/red to warn of clipping.
+    """
+
+    _BARS: Final[int] = 22
+
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        """Builds an empty (zero-level) meter."""
+        super().__init__(parent)
+        self._level: float = 0.0
+        self.setMinimumWidth(120)
+        self.setFixedHeight(14)
+
+    def set_level(self, level: float) -> None:
+        """Sets the displayed level (clamped to ``0..1``) and repaints.
+
+        Args:
+            level (float): Peak amplitude in ``[0, 1]``.
+        """
+        self._level = max(0.0, min(1.0, level))
+        self.update()
+
+    # ``paintEvent`` is a Qt-mandated camelCase override name.
+    def paintEvent(  # noqa: N802  # pylint: disable=invalid-name,unused-argument
+        self, event: QtGui.QPaintEvent | None
+    ) -> None:
+        """Paints the bars: green, then amber, then red towards the top."""
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
+        width = float(self.width())
+        height = float(self.height())
+        gap = 2.0
+        bar_w = max(1.0, (width - gap * (self._BARS - 1)) / self._BARS)
+        lit = int(round((self._level**0.5) * self._BARS))
+        for i in range(self._BARS):
+            frac = i / (self._BARS - 1)
+            if i >= lit:
+                color = QtGui.QColor(255, 255, 255, 38)
+            elif frac > 0.85:
+                color = QtGui.QColor("#ff5b5b")
+            elif frac > 0.7:
+                color = QtGui.QColor("#ffcf5b")
+            else:
+                color = QtGui.QColor("#5ed16a")
+            painter.fillRect(QtCore.QRectF(i * (bar_w + gap), 2.0, bar_w, height - 4.0), color)
+        painter.end()
+
+
 class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attributes,too-many-public-methods
     """Frameless, always-on-top stealth overlay widget.
 
@@ -66,11 +118,14 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
             when the user presses Enter in the input field.
         mic_toggled (bool): Emitted when the user toggles the microphone button —
             ``True`` to start listening, ``False`` to mute.
+        input_volume_changed (int): Emitted when the user moves the microphone
+            volume slider (0..100).
     """
 
     capture_requested = pyqtSignal()
     text_submitted = pyqtSignal(str)
     mic_toggled = pyqtSignal(bool)
+    input_volume_changed = pyqtSignal(int)
 
     def __init__(self, parent: QtWidgets.QWidget | None = None, *, stealth: bool = False) -> None:
         """Builds the overlay window and lays out widgets.
@@ -262,6 +317,20 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._transcript_toggle.setObjectName("transcriptToggle")
         self._transcript_toggle.setChecked(True)
 
+        # Microphone input-volume slider + live level meter (no trip to System Settings).
+        self._volume_label = QtWidgets.QLabel("Громкость", self)
+        self._volume_label.setObjectName("controlLabel")
+        self._volume_slider = QtWidgets.QSlider(Qt.Orientation.Horizontal, self)
+        self._volume_slider.setObjectName("volumeSlider")
+        self._volume_slider.setRange(0, 100)
+        self._volume_slider.setValue(50)
+        self._volume_slider.setToolTip("Громкость микрофона (системная)")
+        self._volume_slider.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        self._level_label = QtWidgets.QLabel("Уровень", self)
+        self._level_label.setObjectName("controlLabel")
+        self._level_meter = _LevelMeter(self)
+
         self.setStyleSheet(self._stylesheet())
 
     def _build_layout(self) -> None:
@@ -281,6 +350,19 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         controls.addWidget(self._input_field, stretch=1)
         controls.addWidget(self._send_button)
         layout.addLayout(controls)
+
+        volume_row = QtWidgets.QHBoxLayout()
+        volume_row.setSpacing(6)
+        volume_row.addWidget(self._volume_label)
+        volume_row.addWidget(self._volume_slider, stretch=1)
+        layout.addLayout(volume_row)
+
+        level_row = QtWidgets.QHBoxLayout()
+        level_row.setSpacing(6)
+        level_row.addWidget(self._level_label)
+        level_row.addWidget(self._level_meter, stretch=1)
+        layout.addLayout(level_row)
+
         layout.addWidget(self._transcript_toggle)
 
     def _connect_signals(self) -> None:
@@ -290,6 +372,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._input_field.returnPressed.connect(self._on_input_submitted)
         self._send_button.clicked.connect(self._on_input_submitted)
         self._transcript_toggle.toggled.connect(self.set_transcript_visible)
+        self._volume_slider.valueChanged.connect(self._on_volume_changed)
 
     @staticmethod
     def _stylesheet() -> str:
@@ -352,6 +435,26 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
                 color: #b8b8c0;
                 font-size: 11px;
             }
+            QLabel#controlLabel {
+                color: #b8b8c0;
+                font-size: 11px;
+                min-width: 64px;
+            }
+            QSlider#volumeSlider::groove:horizontal {
+                height: 4px;
+                background: rgba(255, 255, 255, 40);
+                border-radius: 2px;
+            }
+            QSlider#volumeSlider::sub-page:horizontal {
+                background: #5ed16a;
+                border-radius: 2px;
+            }
+            QSlider#volumeSlider::handle:horizontal {
+                width: 12px;
+                margin: -5px 0;
+                border-radius: 6px;
+                background: #f2f2f2;
+            }
         """
 
     # ------------------------------------------------------------------ #
@@ -378,6 +481,8 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
             listening (bool): The button's new checked state (``True`` = listening).
         """
         self._update_mic_visuals()
+        if not listening:
+            self._level_meter.set_level(0.0)
         logger.debug("Microphone %s by user", "enabled" if listening else "disabled")
         self.mic_toggled.emit(listening)
 
@@ -388,6 +493,11 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._mic_button.setToolTip(
             "Слушаю — нажмите, чтобы выключить микрофон" if listening else "Микрофон выключен — нажмите, чтобы слушать"
         )
+
+    def _on_volume_changed(self, percent: int) -> None:
+        """Re-emits a user slider change as :pyattr:`input_volume_changed`."""
+        logger.debug("Input volume slider -> %d%%", percent)
+        self.input_volume_changed.emit(percent)
 
     # ------------------------------------------------------------------ #
     # Content API
@@ -474,6 +584,8 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         """
         self._mic_button.setChecked(listening)
         self._update_mic_visuals()
+        if not listening:
+            self._level_meter.set_level(0.0)
 
     def is_listening(self) -> bool:
         """Returns whether the mic toggle is in the listening (on) state.
@@ -498,6 +610,37 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._mic_button.setChecked(False)
         self._mic_button.setIcon(self._mic_icon(False))
         self._mic_button.setToolTip("Распознавание речи недоступно")
+        self._level_meter.set_level(0.0)
+
+    # ------------------------------------------------------------------ #
+    # Microphone input volume + live level
+    # ------------------------------------------------------------------ #
+    def set_input_volume(self, percent: int) -> None:
+        """Sets the volume slider position without emitting ``input_volume_changed``.
+
+        Args:
+            percent (int): Volume in percent (0..100, clamped). Used to sync the slider
+                to the current system input volume at startup.
+        """
+        self._volume_slider.blockSignals(True)
+        self._volume_slider.setValue(max(0, min(100, percent)))
+        self._volume_slider.blockSignals(False)
+
+    def input_volume(self) -> int:
+        """Returns the current volume-slider value.
+
+        Returns:
+            int: Slider position in percent (0..100).
+        """
+        return self._volume_slider.value()
+
+    def set_input_level(self, level: float) -> None:
+        """Updates the live microphone input-level meter.
+
+        Args:
+            level (float): Peak amplitude in ``[0, 1]`` (clamped by the meter).
+        """
+        self._level_meter.set_level(level)
 
     # ------------------------------------------------------------------ #
     # Stealth controls

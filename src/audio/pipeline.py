@@ -23,6 +23,7 @@ from src.helpers.logger import get_logger
 logger = get_logger(__name__)
 
 TextSink = Callable[[str], None]
+LevelSink = Callable[[float], None]
 Runner = Callable[[Callable[[], None]], None]
 CaptureFactory = Callable[..., MicrophoneCapture]
 
@@ -36,6 +37,7 @@ class SpeechPipeline:
         *,
         on_partial_text: TextSink,
         on_final_text: TextSink,
+        on_level: Optional[LevelSink] = None,
         capture_factory: CaptureFactory = MicrophoneCapture,
         runner: Optional[Runner] = None,
         sample_rate: int = 16000,
@@ -47,6 +49,8 @@ class SpeechPipeline:
             engine (STTEngine): The speech-to-text engine.
             on_partial_text (TextSink): Called with draft text for in-progress speech.
             on_final_text (TextSink): Called with the finalised utterance text.
+            on_level (Optional[LevelSink]): Called with each block's peak amplitude
+                (0..1) for a live input-level meter; ``None`` disables it.
             capture_factory (CaptureFactory): Builds the capture (injectable for tests).
             runner (Optional[Runner]): Executes transcription work; defaults to a
                 daemon thread. Tests inject a synchronous runner.
@@ -63,6 +67,7 @@ class SpeechPipeline:
         self._capture = capture_factory(
             on_partial=self._handle_partial_audio,
             on_final=self._handle_final_audio,
+            on_level=on_level,
             sample_rate=sample_rate,
             device=device,
         )

@@ -17,6 +17,7 @@ from src.ui.overlay import (
     MOCK_ANSWER_TOKENS,
     OPACITY_LEVELS,
     Overlay,
+    _LevelMeter,
     _MockAnswerStreamer,
     demo,
 )
@@ -388,3 +389,43 @@ def test_header_shows_capitalized_left_aligned_brand(overlay: Overlay) -> None:
     # Assert
     assert overlay._header_label.text() == "Sufler"
     assert bool(overlay._header_label.alignment() & Qt.AlignmentFlag.AlignLeft)
+
+
+# --------------------------------------------------------------------------- #
+# Microphone input volume + level meter
+# --------------------------------------------------------------------------- #
+def test_volume_slider_emits_input_volume_changed(overlay: Overlay, qtbot) -> None:
+    """Moving the volume slider emits ``input_volume_changed`` with the new value."""
+    # Act / Assert
+    with qtbot.waitSignal(overlay.input_volume_changed, timeout=1000) as blocker:
+        overlay._volume_slider.setValue(33)
+    assert blocker.args == [33]
+    assert overlay.input_volume() == 33
+
+
+def test_set_input_volume_does_not_emit(overlay: Overlay, qtbot) -> None:
+    """``set_input_volume`` syncs the slider without emitting ``input_volume_changed``."""
+    # Act / Assert
+    with qtbot.assertNotEmitted(overlay.input_volume_changed):
+        overlay.set_input_volume(70)
+    assert overlay.input_volume() == 70
+
+
+def test_set_input_level_updates_and_clamps_meter(overlay: Overlay) -> None:
+    """``set_input_level`` updates the meter and clamps the value to [0, 1]."""
+    # Act / Assert
+    overlay.set_input_level(0.5)
+    assert overlay._level_meter._level == pytest.approx(0.5)
+    overlay.set_input_level(2.0)
+    assert overlay._level_meter._level == 1.0
+
+
+def test_level_meter_paints_without_error(qtbot) -> None:
+    """The level meter renders (exercising its paint branches) without raising."""
+    # Arrange
+    meter = _LevelMeter()
+    qtbot.addWidget(meter)
+
+    # Act / Assert: grab() forces a paintEvent over green/amber/red bars.
+    meter.set_level(0.9)
+    meter.grab()

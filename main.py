@@ -19,6 +19,7 @@ from PyQt6 import QtGui, QtWidgets
 from src.audio.devices import resolve_input_device
 from src.audio.pipeline import SpeechPipeline
 from src.audio.stt import create_engine
+from src.audio.system_volume import get_input_volume
 from src.config import config
 from src.core.context import RollingContext
 from src.core.controller import Controller
@@ -65,6 +66,7 @@ def build_app(*, claude: Optional[ClaudeClient] = None) -> tuple[Overlay, Contro
     overlay.capture_requested.connect(controller.on_capture)
     overlay.text_submitted.connect(controller.on_submit_text)
     overlay.mic_toggled.connect(controller.on_mic_toggled)
+    overlay.input_volume_changed.connect(controller.on_input_volume_changed)
 
     hotkeys = HotkeyManager(
         capture_hotkey=config.hotkey_capture,
@@ -115,6 +117,7 @@ def _maybe_start_speech(controller: Controller) -> Optional[SpeechPipeline]:
             create_engine(),
             on_partial_text=controller.partial_speech.emit,
             on_final_text=controller.final_speech.emit,
+            on_level=controller.speech_level.emit,
             device=device,
         )
         pipeline.start()
@@ -141,6 +144,9 @@ def main() -> int:  # pragma: no cover - launches the blocking Qt event loop
 
     overlay.show()
     overlay.raise_()
+    initial_volume = get_input_volume()
+    if initial_volume is not None:
+        overlay.set_input_volume(initial_volume)
     pipeline = _maybe_start_speech(controller)
     if pipeline is not None:
         controller.set_speech_pipeline(pipeline)

@@ -13,9 +13,10 @@ from src.audio.stt import Transcript
 class _FakeCapture:
     """Records the handlers the pipeline wires in and start/stop calls."""
 
-    def __init__(self, *, on_partial, on_final, sample_rate=16000, device=None) -> None:
+    def __init__(self, *, on_partial, on_final, on_level=None, sample_rate=16000, device=None) -> None:
         self.on_partial = on_partial
         self.on_final = on_final
+        self.on_level = on_level
         self.sample_rate = sample_rate
         self.device = device
         self.started = 0
@@ -108,6 +109,26 @@ def test_set_listening_starts_and_stops_idempotently() -> None:
     pipeline.set_listening(False)  # idempotent: no double stop
     assert pipeline.is_listening is False
     assert capture.stopped == 1
+
+
+def test_on_level_is_forwarded_to_capture() -> None:
+    captures: dict[str, _FakeCapture] = {}
+
+    def factory(**kwargs):
+        capture = _FakeCapture(**kwargs)
+        captures["capture"] = capture
+        return capture
+
+    SpeechPipeline(
+        MagicMock(),
+        on_partial_text=lambda s: None,
+        on_final_text=lambda s: None,
+        on_level=lambda level: None,
+        capture_factory=factory,
+        runner=lambda work: work(),
+    )
+
+    assert captures["capture"].on_level is not None
 
 
 def test_device_is_forwarded_to_capture() -> None:
