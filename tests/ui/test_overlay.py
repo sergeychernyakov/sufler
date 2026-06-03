@@ -547,3 +547,39 @@ def test_question_and_answer_text_are_selectable(overlay: Overlay) -> None:
     flag = Qt.TextInteractionFlag.TextSelectableByMouse
     assert bool(overlay._question_label.textInteractionFlags() & flag)
     assert bool(overlay._answer_label.textInteractionFlags() & flag)
+
+
+# --------------------------------------------------------------------------- #
+# Clickable terms + back navigation
+# --------------------------------------------------------------------------- #
+def test_linkify_turns_bold_terms_into_links() -> None:
+    """``**term**`` becomes an ``<a href="term:...">`` link; other text is preserved."""
+    out = Overlay._linkify("1. **Фреймворк**: текст")
+    assert '<a href="term:' in out
+    assert "Фреймворк" in out
+    assert "текст" in out
+
+
+def test_answer_link_click_emits_decoded_term(overlay: Overlay, qtbot) -> None:
+    """Clicking a term link emits ``term_activated`` with the URL-decoded term."""
+    with qtbot.waitSignal(overlay.term_activated, timeout=1000) as blocker:
+        overlay._on_answer_link("term:Active%20Record")
+    assert blocker.args == ["Active Record"]
+
+
+def test_show_answer_sets_raw_and_back_button_toggles(overlay: Overlay) -> None:
+    """show_answer stores the raw text; the back button is hidden by default and toggles."""
+    assert overlay._back_button.isHidden() is True
+    overlay.show_answer("**X**: y")
+    assert overlay.answer_raw() == "**X**: y"
+
+    overlay.set_back_visible(True)
+    assert overlay._back_button.isHidden() is False
+    overlay.set_back_visible(False)
+    assert overlay._back_button.isHidden() is True
+
+
+def test_back_button_emits_back_requested(overlay: Overlay, qtbot) -> None:
+    """Activating the back button emits ``back_requested``."""
+    with qtbot.waitSignal(overlay.back_requested, timeout=1000):
+        overlay._back_button.click()
