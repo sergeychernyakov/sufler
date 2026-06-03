@@ -176,7 +176,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         else:
             # Normal window: native title bar (drag + close button), kept on top.
             self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowStaysOnTopHint)
-        self.setWindowTitle("Sufler")
+        self.setWindowTitle("")
         self.resize(400, 340)
         self._move_to_corner()
 
@@ -266,11 +266,6 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
 
     def _build_widgets(self) -> None:
         """Creates the child widgets (labels, button, input)."""
-        # Left-aligned brand header (the native macOS title bar always centers its text).
-        self._header_label = QtWidgets.QLabel("Sufler", self)
-        self._header_label.setObjectName("headerLabel")
-        self._header_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-
         self._question_label = QtWidgets.QLabel("", self)
         self._question_label.setObjectName("questionLabel")
         self._question_label.setWordWrap(True)
@@ -340,7 +335,6 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(6)
-        layout.addWidget(self._header_label)
         layout.addWidget(self._question_label)
         layout.addWidget(self._answer_label, stretch=1)
         layout.addWidget(self._transcript, stretch=1)
@@ -389,12 +383,6 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
                 color: #f2f2f2;
                 font-family: -apple-system, "SF Pro Text", "Helvetica Neue", sans-serif;
                 border-radius: 10px;
-            }
-            QLabel#headerLabel {
-                color: #ffffff;
-                font-size: 14px;
-                font-weight: 700;
-                padding-bottom: 2px;
             }
             QLabel#questionLabel {
                 color: #9ad1ff;
