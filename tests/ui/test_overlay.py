@@ -7,6 +7,8 @@ offscreen Qt platform (configured in ``conftest.py``). Each test follows the
 Arrange -> Act -> Assert pattern.
 """
 
+import re
+
 import pytest
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
@@ -14,6 +16,8 @@ from PyQt6.QtWidgets import QApplication
 from src.models.enums import Mode
 from src.ui.overlay import (
     DEFAULT_AUTO_HIDE_SECONDS,
+    FONT_SCALE_MAX,
+    FONT_SCALE_MIN,
     MOCK_ANSWER_TOKENS,
     OPACITY_LEVELS,
     Overlay,
@@ -444,3 +448,42 @@ def test_muting_dims_input_controls_and_zeroes_level(overlay: Overlay) -> None:
     overlay.set_listening(True)
     assert overlay._volume_slider.isEnabled() is True
     assert overlay._level_meter.isEnabled() is True
+
+
+# --------------------------------------------------------------------------- #
+# Font zoom (Cmd +/-/0)
+# --------------------------------------------------------------------------- #
+def _max_font_px(stylesheet: str) -> int:
+    """Return the largest ``font-size`` (px) declared in a stylesheet."""
+    return max(int(size) for size in re.findall(r"font-size:\s*(\d+)px", stylesheet))
+
+
+def test_font_starts_at_default_scale(overlay: Overlay) -> None:
+    """A fresh overlay is at font scale 1.0."""
+    assert overlay.font_scale() == 1.0
+
+
+def test_increase_font_grows_scale_and_applied_sizes(overlay: Overlay) -> None:
+    """``increase_font`` raises the scale and the applied font sizes."""
+    before = _max_font_px(overlay.styleSheet())
+    overlay.increase_font()
+    assert overlay.font_scale() > 1.0
+    assert _max_font_px(overlay.styleSheet()) > before
+
+
+def test_decrease_then_reset_font(overlay: Overlay) -> None:
+    """``decrease_font`` lowers the scale; ``reset_font`` returns to 1.0."""
+    overlay.decrease_font()
+    assert overlay.font_scale() < 1.0
+    overlay.reset_font()
+    assert overlay.font_scale() == 1.0
+
+
+def test_font_scale_is_clamped(overlay: Overlay) -> None:
+    """The font scale stays within [FONT_SCALE_MIN, FONT_SCALE_MAX]."""
+    for _ in range(40):
+        overlay.increase_font()
+    assert overlay.font_scale() == pytest.approx(FONT_SCALE_MAX)
+    for _ in range(60):
+        overlay.decrease_font()
+    assert overlay.font_scale() == pytest.approx(FONT_SCALE_MIN)
