@@ -25,8 +25,12 @@ See **[`README.md`](./README.md)** for an overview of the project’s purpose, r
 ## 🧪 Testing & Quality
 - Use **pytest**; follow Arrange → Act → Assert.
 - Place tests in a mirroring structure under `tests/`.
-- Target **90 %+** code coverage.
-- Ensure all linters/formatters (e.g. `black`, `isort`, `ruff`, `pylint`) pass before finishing.
+- Target **90 %+** code coverage (critical packages — `llm`, `core`, `audio`, `vision` — aim for **95 %**).
+- Line length is **120**.
+- Run the full local quality gate before finishing: **`bin/ci`**. It mirrors the
+  pre-commit/pre-push hooks: `black`, `isort`, `ruff`, `pylint (≥9.5)`, `mypy`,
+  `bandit`, `pip-audit`, secret scan, and `pytest` + coverage.
+- One-time setup installs the venv, deps and git hooks: **`bin/setup`**.
 
 ---
 
@@ -34,6 +38,15 @@ See **[`README.md`](./README.md)** for an overview of the project’s purpose, r
 - Never hardcode secrets—use environment variables or a secret manager.
 - Sanitize user inputs and escape web outputs.
 - Run dependency audit tools (`pip-audit`, `safety`, etc.) if relevant.
+
+---
+
+## 🌿 Git Workflow (enforced by hooks)
+- `main` is **protected**: direct commits and pushes are blocked. Use feature branches + PRs.
+- Branch names: `<type>/<short-description>` (e.g. `feat/overlay-stealth`).
+- Commit messages follow **Conventional Commits**: `<type>(<scope>): <subject>` (subject ≤ 72 chars).
+- **Every change adds an entry under `[Unreleased]` in [`CHANGELOG.md`](./CHANGELOG.md)** (Keep a Changelog).
+- Full rules and examples: **[`docs/COMMIT_CONVENTION.md`](./docs/COMMIT_CONVENTION.md)**.
 
 ---
 
@@ -47,7 +60,10 @@ See **[`README.md`](./README.md)** for an overview of the project’s purpose, r
 
 ## ✅ Final Deliverables Checklist
 - [ ] Code adheres to `PYTHON_STYLE_GUIDE.md`.
+- [ ] `bin/ci` passes (or all checks PASS/SKIP).
 - [ ] All tests pass (`pytest -q`) with ≥ 90 % coverage.
-- [ ] Linting/formatting passes (`black`, `isort`, `ruff`, `pylint ≥ 9.5`).
+- [ ] Linting/formatting/types pass (`black`, `isort`, `ruff`, `pylint ≥ 9.5`, `mypy`).
 - [ ] No hard-coded secrets; environment variables used where necessary.
+- [ ] Commit messages follow Conventional Commits (see `docs/COMMIT_CONVENTION.md`).
+- [ ] `CHANGELOG.md` `[Unreleased]` updated with the change.
 - [ ] Any setup or run instructions updated in `README.md` if required.

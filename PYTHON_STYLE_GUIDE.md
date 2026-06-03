@@ -102,19 +102,22 @@
 ## ✅ Linting & Code Quality
 
 * Follow **PEP 8**.
-* Tools:
+* Tools (all wired into pre-commit and `bin/ci`):
 
   * `black` (formatting)
-  * `isort` (import sorting)
-  * `flake8` (style guide)
-  * `pylint` (target score ≥ 9.5)
+  * `isort` (import sorting, `--profile black`)
+  * `ruff` (fast linter — replaces flake8)
+  * `pylint` (deep analysis, target score ≥ 9.5)
+  * `mypy` (static type checking)
+  * `bandit` + `pip-audit` (security / dependency CVEs)
+* Run the full gate locally before finishing: **`bin/ci`**.
 * Avoid:
 
   * Long functions → break them up
   * Magic numbers → name them
   * Cyclic imports → restructure
   * `from module import *` → ban it
-* Max line length: 100 chars
+* Max line length: **120 chars** (black/isort/ruff/pylint all agree).
 
 ---
 
@@ -160,7 +163,7 @@
 * 100% type-annotated code.
 * Google-style docstrings for all public APIs.
 * 90%+ test coverage via `pytest`.
-* Fully linted with `black`, `isort`, `flake8`, `pylint (≥9.5)`.
+* Fully linted and typed with `black`, `isort`, `ruff`, `pylint (≥9.5)`, `mypy`.
 * Structured logging and clean error handling.
 * English-only code comments and docs.
 * Code structured around services, not scripts.

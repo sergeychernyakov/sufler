@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# bin/hooks/check-commit-msg — enforce Conventional Commits on the subject line.
+#
+# Usage: check-commit-msg <path-to-commit-msg-file>
+set -euo pipefail
+
+msg_file="${1:?commit message file path required}"
+subject="$(head -n1 "$msg_file")"
+
+# Allow auto-generated subjects (merge/revert/fixup/squash/amend).
+case "$subject" in
+  "Merge "* | "Revert "* | "fixup! "* | "squash! "* | "amend! "*) exit 0 ;;
+esac
+
+types='feat|fix|refactor|perf|test|docs|chore|security|build|ci|style|revert'
+pattern="^(${types})\([a-z0-9._-]+\): .+"
+
+if ! printf '%s' "$subject" | grep -qE "$pattern"; then
+  cat >&2 <<EOF
+
+BLOCKED: commit message does not follow Conventional Commits.
+
+  Format:  <type>(<scope>): <subject>
+  Example: feat(overlay): add click-through stealth mode
+
+  Types:   feat fix refactor perf test docs chore security build ci style revert
+  Scopes:  overlay llm stt audio vision context controller config hotkey ui deps tooling ci docs
+
+  Your subject: ${subject}
+
+  See docs/COMMIT_CONVENTION.md
+EOF
+  exit 1
+fi
+
+# Subject (excluding the "type(scope): " prefix) must be <= 72 chars.
+body="${subject#*: }"
+if [ "${#body}" -gt 72 ]; then
+  echo "BLOCKED: commit subject too long (${#body} chars, max 72)." >&2
+  exit 1
+fi
+exit 0

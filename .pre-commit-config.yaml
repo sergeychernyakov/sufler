@@ -1,56 +1,132 @@
+# .pre-commit-config.yaml
+#
+# Install:  bin/setup
+#   (or manually: pre-commit install --install-hooks \
+#       --hook-type pre-commit --hook-type commit-msg \
+#       --hook-type pre-push --hook-type post-checkout)
+#
+# Stages: pre-commit (format/lint/types/security/secret/main-guard),
+#         commit-msg (conventional commits), post-checkout (branch name warn),
+#         pre-push (tests+coverage, dependency audit, push-to-main guard).
+
+minimum_pre_commit_version: "3.5.0"
+default_install_hook_types: [pre-commit, commit-msg, pre-push, post-checkout]
+default_stages: [pre-commit]
+
 repos:
+  # ── General hygiene ─────────────────────────────────────────────────
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v5.0.0
     hooks:
       - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
       - id: end-of-file-fixer
       - id: trailing-whitespace
-      - id: check-yaml
+        args: ["--markdown-linebreak-ext=md"]
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+      - id: check-case-conflict
       - id: detect-private-key
-      - id: check-added-large-files
+      - id: debug-statements        # pdb / breakpoint() / ipdb left in code
 
+  # ── Imports ─────────────────────────────────────────────────────────
   - repo: https://github.com/PyCQA/isort
-    rev: 5.12.0
+    rev: 5.13.2
     hooks:
       - id: isort
-        language_version: python3
         args: ["--profile", "black", "--line-length", "120"]
 
+  # ── Format ──────────────────────────────────────────────────────────
   - repo: https://github.com/psf/black
-    rev: 23.9.1
+    rev: 24.10.0
     hooks:
       - id: black
-        language_version: python3
         args: ["--line-length", "120"]
 
+  # ── Fast lint ───────────────────────────────────────────────────────
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.9
+    rev: v0.8.6
     hooks:
       - id: ruff
-        args: ["--line-length=120"]
+        args: ["--fix"]
 
+  # ── Deep checks + project policy (system tools from the venv) ────────
   - repo: local
     hooks:
-      - id: test-coverage
-        name: Test Coverage Check
-        entry: bash -c "rm -f .coverage && coverage run -m pytest && coverage report --fail-under=90"
+      - id: pylint
+        name: "pylint (score >= 9.5)"
+        entry: pylint --rcfile=.pylintrc src main.py
+        language: system
+        types: [python]
+        pass_filenames: false
+        require_serial: true
+
+      - id: mypy
+        name: "mypy (static types)"
+        entry: mypy --config-file pyproject.toml
+        language: system
+        types: [python]
+        pass_filenames: false
+        require_serial: true
+
+      - id: bandit
+        name: "bandit (security)"
+        entry: bandit -c pyproject.toml -q -r src main.py
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      - id: secret-scan
+        name: "secret scan (keys / hardcoded creds)"
+        entry: bin/hooks/secret-scan
         language: system
         pass_filenames: false
+        always_run: true
+
+      - id: no-commit-to-main
+        name: "block direct commits to main"
+        entry: bin/hooks/protect-main commit
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: conventional-commit
+        name: "conventional commit message"
+        entry: bin/hooks/check-commit-msg
+        language: system
+        stages: [commit-msg]
+
+      - id: branch-name
+        name: "branch naming convention (warn)"
+        entry: bin/hooks/check-branch-name
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [post-checkout]
+
+      - id: no-push-to-main
+        name: "block direct pushes to main"
+        entry: bin/hooks/protect-main push
+        language: system
+        pass_filenames: false
+        always_run: true
         stages: [pre-push]
 
-      - id: mypyc-compile-check
-        name: MyPyC Compilation Check
-        entry: python compile.py --no-strict --no-clean
+      - id: tests-coverage
+        name: "pytest + coverage (>= 90%)"
+        entry: bin/hooks/run-coverage
         language: system
         pass_filenames: false
-        stages: [pre-commit]
-        verbose: true
+        always_run: true
+        stages: [pre-push]
 
-  - repo: https://github.com/pylint-dev/pylint
-    rev: v3.3.6
-    hooks:
-      - id: pylint
-        name: Code Quality Check
-        entry: pylint --rcfile .pylintrc --fail-under=10.0 src main.py
-        exclude: '^tests/'
+      - id: pip-audit
+        name: "pip-audit (dependency CVEs)"
+        entry: pip-audit -r requirements.txt
         language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

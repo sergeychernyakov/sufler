@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# bin/setup — bootstrap the development environment (idempotent).
+#
+# Creates .venv, installs runtime + dev dependencies, installs git hooks,
+# and prepares runtime directories. Re-run any time deps change.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+PYTHON_BIN="${PYTHON:-python3}"
+
+if [ ! -d .venv ]; then
+  echo "==> Creating virtualenv (.venv)"
+  "$PYTHON_BIN" -m venv .venv
+fi
+
+# shellcheck disable=SC1091
+source .venv/bin/activate
+
+echo "==> Upgrading pip"
+python -m pip install --upgrade pip >/dev/null
+
+echo "==> Installing runtime deps (requirements.txt)"
+pip install -r requirements.txt
+
+echo "==> Installing dev deps (requirements-dev.txt)"
+pip install -r requirements-dev.txt
+
+echo "==> Installing git hooks"
+pre-commit install --install-hooks \
+  --hook-type pre-commit \
+  --hook-type commit-msg \
+  --hook-type pre-push \
+  --hook-type post-checkout
+
+mkdir -p tmp/logs
+if [ ! -f .env ] && [ -f .env.example ]; then
+  cp .env.example .env
+  echo "==> Created .env from .env.example"
+fi
+
+echo ""
+echo "Setup complete."
+echo "  Activate the venv:        source .venv/bin/activate"
+echo "  Run all quality gates:    bin/ci"
+echo "  Note: 'main' is protected — work on feature branches (see docs/COMMIT_CONVENTION.md)."

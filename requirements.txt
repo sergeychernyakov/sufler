@@ -1,11 +1,28 @@
-astroid==3.3.5
-dill==0.3.9
-iniconfig==2.0.0
-isort==5.13.2
-mccabe==0.7.0
-packaging==24.2
-platformdirs==4.3.6
-pluggy==1.5.0
-pylint==3.3.2
-pytest==8.3.4
-tomlkit==0.13.2
+# requirements.txt — runtime dependencies (the application itself)
+#
+# Dev/quality tooling lives in requirements-dev.txt.
+# Do NOT `pip freeze` into this file — keep it to direct, intentional deps.
+
+# GUI / overlay
+PyQt6>=6.6
+
+# Audio capture
+sounddevice>=0.4
+numpy>=1.26
+
+# Screenshots
+mss>=9.0
+
+# Global hotkeys
+pynput>=1.7
+
+# LLM (Claude)
+anthropic>=0.40
+
+# Config / models
+python-dotenv>=1.0
+pydantic>=2.7
+
+# ── Speech-to-text (Apple Silicon, Phase 5) ──
+# Default engine. whisper.cpp (external Metal binary/server) is an alternative — see README.
+mlx-whisper>=0.4          # native Apple Silicon Whisper

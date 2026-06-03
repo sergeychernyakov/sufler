@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# bin/hooks/run-coverage — run the test suite with coverage and enforce thresholds.
+#
+# Used by the pre-push hook. Scaffold-aware: "no tests collected" is not a failure.
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+mkdir -p tmp/logs
+
+set +e
+coverage run -m pytest -q
+rc=$?
+set -e
+
+# pytest exit code 5 == "no tests collected" (skeleton state) -> not a failure.
+if [ "$rc" -eq 5 ]; then
+  echo "run-coverage: no tests collected yet (scaffold state) — coverage gate skipped."
+  exit 0
+fi
+if [ "$rc" -ne 0 ]; then
+  echo "run-coverage: tests failed (exit ${rc})." >&2
+  exit "$rc"
+fi
+
+coverage json -o coverage.json -q
+coverage report
+exec python3 bin/check_coverage
