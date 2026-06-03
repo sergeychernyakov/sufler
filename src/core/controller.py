@@ -124,10 +124,11 @@ class Controller(QObject):
         self._overlay.set_question(text)
 
     def _on_final_speech(self, text: str) -> None:
-        """Records a finalised utterance into the rolling context."""
+        """Records a finalised utterance into the rolling context and transcript."""
         self._context.add_speech(text)
         self._context.set_question(text)
         self._overlay.set_question(text)
+        self._overlay.append_transcript(text)
 
     # ------------------------------------------------------------------ #
     # Internals

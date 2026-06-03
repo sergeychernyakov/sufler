@@ -15,6 +15,7 @@ class _FakeOverlay:
     def __init__(self) -> None:
         self.questions: list[str] = []
         self.answer_tokens: list[str] = []
+        self.transcript: list[str] = []
         self.begun = 0
         self.hidden = 0
         self.shown = 0
@@ -29,6 +30,9 @@ class _FakeOverlay:
 
     def append_answer(self, token: str) -> None:
         self.answer_tokens.append(token)
+
+    def append_transcript(self, text: str) -> None:
+        self.transcript.append(text)
 
     def hide(self) -> None:
         self.hidden += 1

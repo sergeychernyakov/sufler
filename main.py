@@ -52,7 +52,7 @@ def build_app(*, claude: Optional[ClaudeClient] = None) -> tuple[Overlay, Contro
     if not config.anthropic_api_key:
         logger.warning("ANTHROPIC_API_KEY is empty — captures will fail until it is set in .env")
 
-    overlay = Overlay()
+    overlay = Overlay(stealth=config.stealth)
     claude_client = claude or ClaudeClient(api_key=config.anthropic_api_key or "MISSING_API_KEY")
     context = RollingContext()
     controller = Controller(overlay, claude_client, context, mode=_resolve_mode())
@@ -132,7 +132,7 @@ def main() -> int:  # pragma: no cover - launches the blocking Qt event loop
         logger.exception("Could not start global hotkeys — grant Accessibility permission")
 
     overlay.show()
-    overlay.arm_auto_hide()
+    overlay.raise_()
     pipeline = _maybe_start_speech(controller)
     try:
         return app.exec()
