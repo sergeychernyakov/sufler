@@ -76,10 +76,7 @@ def _is_degenerate(text: str) -> bool:
 #: interview speech (e.g. the infamous "Субтитры сделал DimaTorzok").
 _HALLUCINATION_MARKERS: tuple[str, ...] = (
     "dimatorzok",
-    "субтитры сдел",
-    "субтитры созда",
-    "субтитры подготов",
-    "редактор субтитров",
+    "субтитр",  # any subtitle-credit wording: "Субтитры сделал/подогнал/создавал … <name>"
     "продолжение следует",
     "спасибо за просмотр",
     "подписывайтесь",
