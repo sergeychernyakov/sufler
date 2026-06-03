@@ -23,6 +23,8 @@ line under `[Unreleased]`**.
   system mic gain without opening System Settings, and see the mic working at a glance (the meter
   bars turn amber/red to warn of clipping). Muting the mic dims these controls and drops the meter
   to zero. System volume is read/set via `osascript`. _feat(ui)_
+- **Font zoom** — `Cmd +` / `Cmd =` enlarge and `Cmd -` shrink the overlay text, `Cmd 0` resets
+  (all fonts scale 0.7×–2.5×). _feat(ui)_
 
 ### Fixed
 - **App icon transparency** — the source icon was flattened to RGB, so its corners rendered as

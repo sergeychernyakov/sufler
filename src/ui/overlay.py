@@ -15,6 +15,7 @@ visually.
 
 from __future__ import annotations
 
+import re
 import sys
 from typing import Final
 
@@ -32,6 +33,11 @@ logger = get_logger(__name__)
 
 # Stealth opacity levels (percent) cycled by ``cycle_opacity``.
 OPACITY_LEVELS: Final[tuple[int, ...]] = (20, 40, 70)
+
+# Font zoom (Cmd +/-/0): a multiplier applied to every stylesheet font-size.
+FONT_SCALE_STEP: Final[float] = 0.1
+FONT_SCALE_MIN: Final[float] = 0.7
+FONT_SCALE_MAX: Final[float] = 2.5
 
 # Default auto-hide window (seconds); the spec asks for 10-15 s.
 DEFAULT_AUTO_HIDE_SECONDS: Final[float] = 12.0
@@ -145,6 +151,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._click_through: bool = False
         self._compact: bool = False
         self._drag_offset: QtCore.QPoint | None = None
+        self._font_scale: float = 1.0
 
         # Single-shot timer used by ``arm_auto_hide``.
         self._auto_hide_timer = QtCore.QTimer(self)
@@ -155,6 +162,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._build_widgets()
         self._build_layout()
         self._connect_signals()
+        self._build_shortcuts()
 
         if self._stealth:
             self.set_opacity_percent(OPACITY_LEVELS[self._opacity_index])
@@ -328,7 +336,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._level_label.setObjectName("controlLabel")
         self._level_meter = _LevelMeter(self)
 
-        self.setStyleSheet(self._stylesheet())
+        self.setStyleSheet(self._scaled_stylesheet())
 
     def _build_layout(self) -> None:
         """Arranges the child widgets in a vertical layout."""
@@ -369,6 +377,61 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._send_button.clicked.connect(self._on_input_submitted)
         self._transcript_toggle.toggled.connect(self.set_transcript_visible)
         self._volume_slider.valueChanged.connect(self._on_volume_changed)
+
+    def _build_shortcuts(self) -> None:
+        """Wires keyboard shortcuts for font zoom (``Cmd +`` / ``Cmd -`` / ``Cmd 0`` on macOS)."""
+        bindings = (
+            (QtGui.QKeySequence.StandardKey.ZoomIn, self.increase_font),
+            (QtGui.QKeySequence("Ctrl+="), self.increase_font),  # Cmd+= (no Shift) on macOS
+            (QtGui.QKeySequence.StandardKey.ZoomOut, self.decrease_font),
+            (QtGui.QKeySequence("Ctrl+-"), self.decrease_font),
+            (QtGui.QKeySequence("Ctrl+0"), self.reset_font),
+        )
+        for sequence, slot in bindings:
+            QtGui.QShortcut(sequence, self).activated.connect(slot)
+
+    # ------------------------------------------------------------------ #
+    # Font zoom (Cmd +/-/0)
+    # ------------------------------------------------------------------ #
+    def increase_font(self) -> None:
+        """Increases the overlay font size by one step (``Cmd +``)."""
+        self._set_font_scale(self._font_scale + FONT_SCALE_STEP)
+
+    def decrease_font(self) -> None:
+        """Decreases the overlay font size by one step (``Cmd -``)."""
+        self._set_font_scale(self._font_scale - FONT_SCALE_STEP)
+
+    def reset_font(self) -> None:
+        """Resets the overlay font size to the default (``Cmd 0``)."""
+        self._set_font_scale(1.0)
+
+    def font_scale(self) -> float:
+        """Returns the current font-zoom multiplier (1.0 = default).
+
+        Returns:
+            float: The font scale currently applied.
+        """
+        return self._font_scale
+
+    def _set_font_scale(self, scale: float) -> None:
+        """Clamps the font-zoom multiplier to ``[MIN, MAX]`` and restyles the overlay."""
+        self._font_scale = max(FONT_SCALE_MIN, min(FONT_SCALE_MAX, round(scale, 2)))
+        self.setStyleSheet(self._scaled_stylesheet())
+        logger.debug("Font scale -> %.2f", self._font_scale)
+
+    def _scaled_stylesheet(self) -> str:
+        """Returns the base style sheet with every font size scaled by the current zoom.
+
+        Returns:
+            str: The style sheet with each ``font-size`` multiplied by
+            :pyattr:`_font_scale` (floored at 8 px).
+        """
+
+        def _scale(match: re.Match[str]) -> str:
+            size = max(8, round(int(match.group(1)) * self._font_scale))
+            return f"font-size: {size}px"
+
+        return re.sub(r"font-size:\s*(\d+)px", _scale, self._stylesheet())
 
     @staticmethod
     def _stylesheet() -> str:
