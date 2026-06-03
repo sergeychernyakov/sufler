@@ -9,7 +9,26 @@ line under `[Unreleased]`**.
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+- **Normal-window UI** (default): native title bar (drag + close-to-quit), always-on-top;
+  the frameless stealth overlay is now opt-in via `SUFLER_STEALTH=true`. _feat(ui)_
+- **Live transcript** panel with a show/hide toggle; a **Send** button (⏎) beside the manual
+  input; the capture button is a vector **camera icon**; the window is draggable by its body. _feat(ui)_
+- **`bin/make_app`** — builds a double-clickable macOS `sufler.app` launcher. _chore(tooling)_
+
+### Fixed
+- **Real-time STT now works reliably** (it previously produced empty/garbled output, stalled,
+  or hallucinated repeated phrases on silence):
+  - Copy audio out of the `sounddevice` callback buffer — it is reused, so stored views were
+    overwritten before transcription (**the core bug**). _fix(audio)_
+  - Resolve the Whisper model to a local path once — avoids a slow per-call Hugging Face fetch
+    that stalled transcription. _fix(stt)_
+  - Transcribe only finalized utterances (not the growing buffer on every partial) and cap
+    utterance length at 8 s — removes the engine backlog. _fix(audio)_
+  - Peak-normalize quiet audio; gate on RMS and drop degenerate/repetitive output
+    (`condition_on_previous_text=False`) — quiet speech is recognized, silence stays empty. _fix(stt)_
+- **Overlay visibility on macOS** — `WA_MacAlwaysShowToolWindow`, explicit top-right placement,
+  and no auto-hide at launch (the window stayed hidden/blank before). _fix(ui)_
 
 ## [0.1.0] - 2026-06-03
 
