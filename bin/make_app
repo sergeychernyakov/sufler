@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# bin/make_app — build a minimal double-clickable macOS .app that launches sufler.
+#
+# The bundle bakes in the absolute paths of this project and the current Python
+# (so Finder, which has no shell PATH/pyenv, can launch it). Re-run after moving
+# the project or switching Python/venv.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PY="$(python3 -c 'import sys; print(sys.executable)')"
+APP="$ROOT/sufler.app"
+
+rm -rf "$APP"
+mkdir -p "$APP/Contents/MacOS"
+
+cat > "$APP/Contents/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>sufler</string>
+  <key>CFBundleDisplayName</key><string>sufler</string>
+  <key>CFBundleIdentifier</key><string>com.sergeychernyakov.sufler</string>
+  <key>CFBundleVersion</key><string>0.1.0</string>
+  <key>CFBundleShortVersionString</key><string>0.1.0</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleExecutable</key><string>sufler</string>
+  <key>NSHighResolutionCapable</key><true/>
+  <key>NSMicrophoneUsageDescription</key><string>sufler transcribes interview audio locally.</string>
+</dict>
+</plist>
+PLIST
+
+cat > "$APP/Contents/MacOS/sufler" <<LAUNCH
+#!/bin/bash
+cd "$ROOT"
+exec "$PY" main.py >> "$ROOT/tmp/logs/app.out" 2>&1
+LAUNCH
+chmod +x "$APP/Contents/MacOS/sufler"
+
+mkdir -p "$ROOT/tmp/logs"
+echo "Built $APP"
+echo "Double-click it in Finder to launch sufler (logs -> tmp/logs/app.out)."
