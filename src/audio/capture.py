@@ -61,6 +61,7 @@ class MicrophoneCapture:  # pylint: disable=too-many-instance-attributes
         partial_seconds: float = 1.2,
         silence_seconds: float = 0.7,
         silence_rms: float = 0.01,
+        max_utterance_seconds: float = 8.0,
         device: Optional[Union[int, str]] = None,
     ) -> None:
         """Configures the capturer and its segmentation thresholds.
@@ -99,9 +100,13 @@ class MicrophoneCapture:  # pylint: disable=too-many-instance-attributes
         self._partial_samples = max(1, int(round(partial_seconds * sample_rate)))
         #: Samples that constitute the ``silence_seconds`` finalize window.
         self._silence_samples = max(1, int(round(silence_seconds * sample_rate)))
+        #: Hard cap on utterance length; forces a finalize so the buffer can't grow unbounded.
+        self._max_utterance_samples = max(1, int(round(max_utterance_seconds * sample_rate)))
 
         #: Voiced (plus interspersed) samples buffered for the current utterance.
         self._buffer: list[np.ndarray] = []
+        #: Total samples buffered this utterance (drives the hard length cap).
+        self._total_samples = 0
         #: Voiced samples seen so far this utterance; drives partial boundaries.
         self._voiced_samples = 0
         #: Consecutive trailing silence samples since the last voiced block.
@@ -173,7 +178,9 @@ class MicrophoneCapture:  # pylint: disable=too-many-instance-attributes
         """
         if status:
             logger.warning("Microphone stream status: %s", status)
-        self._ingest(np.asarray(indata, dtype=np.float32).reshape(-1))
+        # ``indata`` is a reused buffer — COPY it (np.array), or buffered blocks get
+        # overwritten by later callbacks before transcription and decode to silence.
+        self._ingest(np.array(indata, dtype=np.float32).reshape(-1))
 
     def _ingest(self, block: np.ndarray) -> None:
         """Segments a block of mono samples, emitting partials and finals.
@@ -201,6 +208,7 @@ class MicrophoneCapture:  # pylint: disable=too-many-instance-attributes
             return
 
         self._buffer.append(samples)
+        self._total_samples += samples.size
         if is_silent:
             self._trailing_silence += samples.size
         else:
@@ -208,7 +216,7 @@ class MicrophoneCapture:  # pylint: disable=too-many-instance-attributes
             self._voiced_samples += samples.size
             self._emit_due_partials()
 
-        if self._trailing_silence >= self._silence_samples:
+        if self._trailing_silence >= self._silence_samples or self._total_samples >= self._max_utterance_samples:
             self._finalize()
 
     def _is_silent(self, samples: np.ndarray) -> bool:
@@ -257,6 +265,7 @@ class MicrophoneCapture:  # pylint: disable=too-many-instance-attributes
     def _reset(self) -> None:
         """Clears all per-utterance buffers and counters."""
         self._buffer = []
+        self._total_samples = 0
         self._voiced_samples = 0
         self._trailing_silence = 0
         self._partials_emitted = 0

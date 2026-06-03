@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# bin/make_app — build a minimal double-clickable macOS .app that launches sufler.
+#
+# The bundle bakes in the absolute paths of this project and the current Python
+# (so Finder, which has no shell PATH/pyenv, can launch it) plus a multi-resolution
+# icon generated from assets/icon.png. Re-run after moving the project, switching
+# Python/venv, or changing the icon.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PY="$(python3 -c 'import sys; print(sys.executable)')"
+APP="$ROOT/sufler.app"
+ICON_SRC="$ROOT/assets/icon.png"
+
+rm -rf "$APP"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+
+# --- Icon: build a multi-resolution sufler.icns from assets/icon.png ---------
+# macOS reads the Dock/Finder icon from the .icns named by CFBundleIconFile. We
+# render every standard iconset size (1x + 2x) from the single source PNG so the
+# icon stays crisp from the 16 px Finder list to the 1024 px Retina Dock tile.
+ICON_PLIST_ENTRY=""
+if [[ -f "$ICON_SRC" ]] && command -v sips >/dev/null && command -v iconutil >/dev/null; then
+  ICONSET_DIR="$(mktemp -d)"
+  ICONSET="$ICONSET_DIR/sufler.iconset"
+  mkdir -p "$ICONSET"
+  # name:pixels pairs — the exact filenames `iconutil` expects in an .iconset.
+  for spec in 16x16:16 16x16@2x:32 32x32:32 32x32@2x:64 \
+              128x128:128 128x128@2x:256 256x256:256 256x256@2x:512 \
+              512x512:512 512x512@2x:1024; do
+    name="${spec%%:*}"; px="${spec##*:}"
+    sips -z "$px" "$px" "$ICON_SRC" --out "$ICONSET/icon_${name}.png" >/dev/null
+  done
+  iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/sufler.icns"
+  rm -rf "$ICONSET_DIR"
+  ICON_PLIST_ENTRY="  <key>CFBundleIconFile</key><string>sufler</string>"
+  echo "Icon: generated sufler.icns from assets/icon.png"
+else
+  echo "Icon: assets/icon.png missing (or sips/iconutil unavailable) — building without an icon" >&2
+fi
+
+cat > "$APP/Contents/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>sufler</string>
+  <key>CFBundleDisplayName</key><string>sufler</string>
+  <key>CFBundleIdentifier</key><string>com.sergeychernyakov.sufler</string>
+  <key>CFBundleVersion</key><string>0.2.0</string>
+  <key>CFBundleShortVersionString</key><string>0.2.0</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleExecutable</key><string>sufler</string>
+$ICON_PLIST_ENTRY
+  <key>NSHighResolutionCapable</key><true/>
+  <key>NSMicrophoneUsageDescription</key><string>sufler transcribes interview audio locally.</string>
+</dict>
+</plist>
+PLIST
+
+cat > "$APP/Contents/MacOS/sufler" <<LAUNCH
+#!/bin/bash
+cd "$ROOT"
+exec "$PY" main.py >> "$ROOT/tmp/logs/app.out" 2>&1
+LAUNCH
+chmod +x "$APP/Contents/MacOS/sufler"
+
+# Nudge Finder/Launch Services to drop any cached generic icon for this path.
+touch "$APP"
+
+mkdir -p "$ROOT/tmp/logs"
+echo "Built $APP"
+echo "Double-click it in Finder to launch sufler (logs -> tmp/logs/app.out)."

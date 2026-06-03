@@ -28,6 +28,8 @@ def overlay(qtbot):
     Returns:
         Overlay: A new overlay instance added to ``qtbot`` for lifecycle mgmt.
     """
-    widget = Overlay()
+    # stealth=True keeps the opacity-cycle / translucency behaviour the suite asserts
+    # (normal mode starts fully opaque); all other API is mode-independent.
+    widget = Overlay(stealth=True)
     qtbot.addWidget(widget)
     return widget

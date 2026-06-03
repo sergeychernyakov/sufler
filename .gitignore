@@ -169,3 +169,6 @@ compare.py
 
 # Claude Code agent worktrees (transient)
 .claude/worktrees/
+
+# Generated macOS app bundle (machine-specific paths)
+sufler.app/

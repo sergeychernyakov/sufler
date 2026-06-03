@@ -52,7 +52,7 @@ MOCK_ANSWER_TOKENS: Final[tuple[str, ...]] = (
 )
 
 
-class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attributes
+class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attributes,too-many-public-methods
     """Frameless, always-on-top stealth overlay widget.
 
     The widget renders two stacked text areas (question and answer), a capture
@@ -69,17 +69,22 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
     capture_requested = pyqtSignal()
     text_submitted = pyqtSignal(str)
 
-    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
-        """Builds the overlay, applies stealth window flags and lays out widgets.
+    def __init__(self, parent: QtWidgets.QWidget | None = None, *, stealth: bool = False) -> None:
+        """Builds the overlay window and lays out widgets.
 
         Args:
             parent (QtWidgets.QWidget | None): Optional Qt parent widget.
+            stealth (bool): ``True`` builds a frameless, translucent, always-on-top
+                overlay kept out of the Dock. ``False`` (default) builds a normal
+                window with a native title bar (drag + close button).
         """
         super().__init__(parent)
 
+        self._stealth: bool = stealth
         self._opacity_index: int = len(OPACITY_LEVELS) - 1  # start at 70 %
         self._click_through: bool = False
         self._compact: bool = False
+        self._drag_offset: QtCore.QPoint | None = None
 
         # Single-shot timer used by ``arm_auto_hide``.
         self._auto_hide_timer = QtCore.QTimer(self)
@@ -91,20 +96,62 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._build_layout()
         self._connect_signals()
 
-        self.set_opacity_percent(OPACITY_LEVELS[self._opacity_index])
-        logger.debug("Overlay initialized (opacity=%d%%)", OPACITY_LEVELS[self._opacity_index])
+        if self._stealth:
+            self.set_opacity_percent(OPACITY_LEVELS[self._opacity_index])
+        logger.debug("Overlay initialized (stealth=%s)", self._stealth)
 
     # ------------------------------------------------------------------ #
     # Construction helpers
     # ------------------------------------------------------------------ #
     def _build_window(self) -> None:
-        """Applies the frameless, always-on-top, translucent stealth flags."""
-        # ``Tool`` keeps the window out of the Dock / app switcher on macOS.
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        """Applies window flags: a normal titled window, or a stealth overlay."""
+        if self._stealth:
+            # Frameless, always-on-top, translucent; ``Tool`` keeps it out of the Dock.
+            self.setWindowFlags(
+                Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool
+            )
+            self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+            # Keep the Tool window visible even when sufler is not the active macOS app.
+            self.setAttribute(Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow, True)
+        else:
+            # Normal window: native title bar (drag + close button), kept on top.
+            self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowStaysOnTopHint)
         self.setWindowTitle("sufler")
-        # Small window positioned to the side rather than centered.
-        self.resize(380, 280)
+        self.resize(400, 340)
+        self._move_to_corner()
+
+    def _move_to_corner(self) -> None:
+        """Positions the overlay near the top-right of the primary screen."""
+        screen = QtGui.QGuiApplication.primaryScreen()
+        if screen is not None:
+            area = screen.availableGeometry()
+            self.move(area.right() - self.width() - 20, area.top() + 40)
+
+    @staticmethod
+    def _capture_icon() -> QtGui.QIcon:
+        """Draws a monochrome camera icon (font-independent, fits the dark UI).
+
+        Returns:
+            QtGui.QIcon: A crisp vector camera icon for the capture button.
+        """
+        size = 24
+        pix = QtGui.QPixmap(size, size)
+        pix.fill(Qt.GlobalColor.transparent)
+        painter = QtGui.QPainter(pix)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
+        color = QtGui.QColor("#f2f2f2")
+        painter.setPen(QtGui.QPen(color, 1.6))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        # Viewfinder bump on top of the body.
+        painter.drawRoundedRect(QtCore.QRectF(8.0, 4.5, 8.0, 4.0), 1.5, 1.5)
+        # Camera body.
+        painter.drawRoundedRect(QtCore.QRectF(2.5, 7.5, 19.0, 13.0), 3.0, 3.0)
+        # Lens: outer ring + filled centre.
+        painter.drawEllipse(QtCore.QPointF(12.0, 14.5), 4.2, 4.2)
+        painter.setBrush(color)
+        painter.drawEllipse(QtCore.QPointF(12.0, 14.5), 1.6, 1.6)
+        painter.end()
+        return QtGui.QIcon(pix)
 
     def _build_widgets(self) -> None:
         """Creates the child widgets (labels, button, input)."""
@@ -120,14 +167,32 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._answer_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self._answer_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
-        self._capture_button = QtWidgets.QPushButton("📸 Скрин", self)
+        self._capture_button = QtWidgets.QPushButton(self)
         self._capture_button.setObjectName("captureButton")
+        self._capture_button.setIcon(self._capture_icon())
+        self._capture_button.setIconSize(QtCore.QSize(20, 20))
+        self._capture_button.setToolTip("Скриншот экрана → Claude")
         self._capture_button.setCursor(Qt.CursorShape.PointingHandCursor)
 
         self._input_field = QtWidgets.QLineEdit(self)
         self._input_field.setObjectName("inputField")
         self._input_field.setPlaceholderText("Введите вопрос вручную…")
         self._input_field.setClearButtonEnabled(True)
+
+        self._send_button = QtWidgets.QPushButton("⏎", self)
+        self._send_button.setObjectName("sendButton")
+        self._send_button.setToolTip("Отправить (Enter)")
+        self._send_button.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        self._transcript = QtWidgets.QTextEdit(self)
+        self._transcript.setObjectName("transcript")
+        self._transcript.setReadOnly(True)
+        self._transcript.setPlaceholderText("Распознанная речь появится здесь…")
+        self._transcript.setMaximumHeight(120)
+
+        self._transcript_toggle = QtWidgets.QCheckBox("Показывать распознавание", self)
+        self._transcript_toggle.setObjectName("transcriptToggle")
+        self._transcript_toggle.setChecked(True)
 
         self.setStyleSheet(self._stylesheet())
 
@@ -138,17 +203,22 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         layout.setSpacing(6)
         layout.addWidget(self._question_label)
         layout.addWidget(self._answer_label, stretch=1)
+        layout.addWidget(self._transcript, stretch=1)
 
         controls = QtWidgets.QHBoxLayout()
         controls.setSpacing(6)
         controls.addWidget(self._capture_button)
         controls.addWidget(self._input_field, stretch=1)
+        controls.addWidget(self._send_button)
         layout.addLayout(controls)
+        layout.addWidget(self._transcript_toggle)
 
     def _connect_signals(self) -> None:
         """Wires child-widget signals to the overlay's public signals."""
         self._capture_button.clicked.connect(self._on_capture_clicked)
         self._input_field.returnPressed.connect(self._on_input_submitted)
+        self._send_button.clicked.connect(self._on_input_submitted)
+        self._transcript_toggle.toggled.connect(self.set_transcript_visible)
 
     @staticmethod
     def _stylesheet() -> str:
@@ -173,14 +243,14 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
                 color: #f2f2f2;
                 font-size: 13px;
             }
-            QPushButton#captureButton {
+            QPushButton#captureButton, QPushButton#sendButton {
                 background-color: rgba(60, 60, 70, 230);
                 border: 1px solid rgba(120, 120, 140, 200);
                 border-radius: 6px;
-                padding: 4px 8px;
-                font-size: 12px;
+                padding: 4px 10px;
+                font-size: 15px;
             }
-            QPushButton#captureButton:hover {
+            QPushButton#captureButton:hover, QPushButton#sendButton:hover {
                 background-color: rgba(80, 80, 92, 240);
             }
             QLineEdit#inputField {
@@ -189,6 +259,17 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
                 border-radius: 6px;
                 padding: 4px 6px;
                 font-size: 12px;
+            }
+            QTextEdit#transcript {
+                background-color: rgba(30, 34, 40, 230);
+                border: 1px solid rgba(90, 110, 130, 180);
+                border-radius: 6px;
+                color: #cfe8ff;
+                font-size: 12px;
+            }
+            QCheckBox#transcriptToggle {
+                color: #b8b8c0;
+                font-size: 11px;
             }
         """
 
@@ -247,6 +328,37 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
             str: The text shown in the answer area.
         """
         return self._answer_label.text()
+
+    # ------------------------------------------------------------------ #
+    # Live transcript (recognized speech feed)
+    # ------------------------------------------------------------------ #
+    def append_transcript(self, text: str) -> None:
+        """Appends a finalized recognized utterance to the live transcript.
+
+        Args:
+            text (str): The recognized text to append (blank text is ignored).
+        """
+        text = text.strip()
+        if text:
+            self._transcript.append(text)  # new paragraph + auto-scroll
+
+    def clear_transcript(self) -> None:
+        """Clears the live transcript area."""
+        self._transcript.clear()
+
+    def set_transcript_visible(self, visible: bool) -> None:
+        """Shows or hides the live transcript (the recognition feed)."""
+        self._transcript.setVisible(visible)
+        if self._transcript_toggle.isChecked() != visible:
+            self._transcript_toggle.setChecked(visible)
+
+    def is_transcript_visible(self) -> bool:
+        """Returns whether the live transcript is currently visible.
+
+        Returns:
+            bool: ``True`` if the transcript area is visible.
+        """
+        return self._transcript.isVisible()
 
     # ------------------------------------------------------------------ #
     # Stealth controls
@@ -365,6 +477,28 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
     # ------------------------------------------------------------------ #
     # Qt event overrides
     # ------------------------------------------------------------------ #
+    # Drag the window by its body (works for the frameless stealth mode too).
+    def mousePressEvent(self, event: QtGui.QMouseEvent | None) -> None:  # noqa: N802  # pylint: disable=invalid-name
+        """Begins a window drag on left-button press."""
+        if event is not None and event.button() == Qt.MouseButton.LeftButton:
+            self._drag_offset = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QtGui.QMouseEvent | None) -> None:  # noqa: N802  # pylint: disable=invalid-name
+        """Moves the window while the left button is held."""
+        if event is not None and self._drag_offset is not None and event.buttons() & Qt.MouseButton.LeftButton:
+            self.move(event.globalPosition().toPoint() - self._drag_offset)
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QtGui.QMouseEvent | None) -> None:  # noqa: N802  # pylint: disable=invalid-name
+        """Ends a window drag."""
+        self._drag_offset = None
+        super().mouseReleaseEvent(event)
+
     # ``keyPressEvent`` is a Qt-mandated camelCase override name.
     def keyPressEvent(self, event: QtGui.QKeyEvent | None) -> None:  # noqa: N802  # pylint: disable=invalid-name
         """Adds a local Escape panic shortcut on top of global hotkeys.

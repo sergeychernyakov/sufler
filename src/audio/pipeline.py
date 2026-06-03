@@ -74,9 +74,12 @@ class SpeechPipeline:
         """Stops listening to the microphone."""
         self._capture.stop()
 
-    def _handle_partial_audio(self, audio: np.ndarray) -> None:
-        """Transcribes a partial (in-progress) utterance off the audio thread."""
-        self._runner(lambda: self._transcribe(audio, self._on_partial_text))
+    def _handle_partial_audio(self, audio: np.ndarray) -> None:  # pylint: disable=unused-argument
+        """Partials are intentionally not transcribed (finals only).
+
+        Re-transcribing the growing utterance on every partial overloaded the engine;
+        only finalized utterances are transcribed, which keeps recognition reliable.
+        """
 
     def _handle_final_audio(self, audio: np.ndarray) -> None:
         """Transcribes a finalised utterance off the audio thread."""

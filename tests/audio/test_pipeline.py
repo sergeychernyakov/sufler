@@ -64,10 +64,13 @@ def test_final_audio_transcribes_and_forwards_text() -> None:
     engine.transcribe.assert_called_once()
 
 
-def test_partial_audio_forwards_draft_text() -> None:
-    _, capture, _, partials, _ = _make(text="драфт")
+def test_partial_audio_is_not_transcribed() -> None:
+    # Partials are intentionally ignored (only finals are transcribed) — re-transcribing
+    # the growing utterance on every partial overloaded the engine.
+    _, capture, engine, partials, _ = _make(text="драфт")
     capture.on_partial(_audio())
-    assert partials == ["драфт"]
+    assert partials == []
+    engine.transcribe.assert_not_called()
 
 
 def test_blank_transcript_is_not_forwarded() -> None:
