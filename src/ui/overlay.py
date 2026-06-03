@@ -408,7 +408,6 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         nav_row.setSpacing(6)
         nav_row.addWidget(self._back_button)
         nav_row.addWidget(self._question_label, stretch=1)
-        nav_row.addWidget(self._copy_button)
         nav_row.addWidget(self._forward_button)
         layout.addLayout(nav_row)
 
@@ -428,6 +427,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         controls.addWidget(self._mic_button)
         controls.addWidget(self._input_field, stretch=1)
         controls.addWidget(self._send_button)
+        controls.addWidget(self._copy_button)
         layout.addLayout(controls)
 
         model_row = QtWidgets.QHBoxLayout()
@@ -851,9 +851,10 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         """
         out: list[str] = []
         last = 0
-        for match in re.finditer(r"\*\*(.+?)\*\*", raw):
+        # Link bold **terms** (thesis headers) and `code` spans (the English terms).
+        for match in re.finditer(r"\*\*(.+?)\*\*|`([^`]+)`", raw):
             out.append(html.escape(raw[last : match.start()]))
-            term = match.group(1).strip()
+            term = (match.group(1) or match.group(2) or "").strip()
             out.append(f'<a href="term:{quote(term)}" style="color:#9ad1ff;">{html.escape(term)}</a>')
             last = match.end()
         out.append(html.escape(raw[last:]))

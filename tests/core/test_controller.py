@@ -128,6 +128,20 @@ def test_on_submit_text_ignores_blank() -> None:
     assert claude.calls == []
 
 
+def test_single_word_becomes_definition_question(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(config, "answer_lang", "ru")
+    controller, overlay, claude, _ = _make()
+    controller.on_submit_text("REST")
+    assert claude.calls[-1]["question"] == "Что такое REST?"
+    assert overlay.questions[-1] == "Что такое REST?"
+
+
+def test_multiword_input_is_left_as_is() -> None:
+    controller, _, claude, _ = _make()
+    controller.on_submit_text("расскажи про индексы")
+    assert claude.calls[-1]["question"] == "расскажи про индексы"
+
+
 def test_on_answer_last_uses_recent_speech() -> None:
     controller, _, claude, context = _make()
     context.add_speech("расскажи про индексы в postgres")

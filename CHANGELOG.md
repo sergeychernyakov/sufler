@@ -35,9 +35,12 @@ line under `[Unreleased]`**.
 - **Auto-answer recognized speech** — each finalized utterance is answered automatically (the live
   prompter flow): speak a question → it answers. Controlled by the **microphone toggle** (mic off =
   no recognition = no answers); can be disabled outright via `SUFLER_AUTO_ANSWER=false`. _feat(controller)_
-- **Drill-down on terms** — the bold `**terms**` in an answer are clickable: tapping one asks the
-  LLM about that term and navigates into a fresh answer (unlimited depth). Browser-style **back
-  (←)** / **forward (→)** buttons at the top of the window move through the history. _feat(ui)_
+- **Drill-down on terms** — the bold `**terms**` and `` `code` `` spans (the English terms) in an
+  answer are clickable: tapping one asks the LLM about that term and navigates into a fresh answer
+  (unlimited depth). Browser-style **back (←)** / **forward (→)** buttons at the top move through
+  the history. _feat(ui)_
+- **Single-word lookup** — typing a bare word + Enter is treated as a definition query ("Что такое
+  <word>?" / "What is <word>?" by language). _feat(controller)_
 - **In-window model selector** — a dropdown switches the answer model on the fly (the active
   provider's free models). _feat(ui)_
 - **Output-language selector** — a dropdown (right of the model selector) sets the answer language

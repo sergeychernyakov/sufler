@@ -560,6 +560,14 @@ def test_linkify_turns_bold_terms_into_links() -> None:
     assert "текст" in out
 
 
+def test_linkify_turns_code_spans_into_links() -> None:
+    """Backtick `code` terms (the English terms) also become clickable links."""
+    out = Overlay._linkify("используй `thread` и `REST`")
+    assert out.count('<a href="term:') == 2
+    assert "thread" in out
+    assert "REST" in out
+
+
 def test_answer_link_click_emits_decoded_term(overlay: Overlay, qtbot) -> None:
     """Clicking a term link emits ``term_activated`` with the URL-decoded term."""
     with qtbot.waitSignal(overlay.term_activated, timeout=1000) as blocker:
