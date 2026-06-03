@@ -632,3 +632,22 @@ def test_copy_button_copies_question_and_answer(overlay: Overlay) -> None:
     assert "Вопрос?" in clip
     assert "Термин" in clip
     assert "**" not in clip
+
+
+def test_answer_lives_in_a_scroll_area(overlay: Overlay) -> None:
+    """The answer label is wrapped in a resizable scroll area (long answers scroll)."""
+    assert overlay._answer_scroll.widget() is overlay._answer_label
+    assert overlay._answer_scroll.widgetResizable() is True
+
+
+def test_render_strips_think_blocks(overlay: Overlay) -> None:
+    """``<think>…</think>`` reasoning is removed from the rendered answer."""
+    overlay.show_answer("<think>скрытые рассуждения</think>\n**Ответ**: текст")
+    assert "think" not in overlay.answer_raw()
+    assert "рассуждения" not in overlay.answer_raw()
+    assert "Ответ" in overlay.answer_raw()
+
+
+def test_language_combo_has_a_min_width(overlay: Overlay) -> None:
+    """The language selector has a sensible minimum width (was clipped)."""
+    assert overlay._lang_combo.minimumWidth() >= 48
