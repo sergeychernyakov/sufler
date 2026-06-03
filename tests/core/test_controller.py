@@ -16,6 +16,7 @@ class _FakeOverlay:
         self.questions: list[str] = []
         self.answer_tokens: list[str] = []
         self.transcript: list[str] = []
+        self.levels: list[float] = []
         self.begun = 0
         self.hidden = 0
         self.shown = 0
@@ -33,6 +34,9 @@ class _FakeOverlay:
 
     def append_transcript(self, text: str) -> None:
         self.transcript.append(text)
+
+    def set_input_level(self, level: float) -> None:
+        self.levels.append(level)
 
     def hide(self) -> None:
         self.hidden += 1
@@ -189,3 +193,23 @@ def test_on_mic_toggled_forwards_to_attached_pipeline() -> None:
 def test_on_mic_toggled_without_pipeline_is_noop() -> None:
     controller, _, _, _ = _make()
     controller.on_mic_toggled(False)  # no pipeline attached -> must not raise
+
+
+def test_speech_level_updates_overlay_meter() -> None:
+    controller, overlay, _, _ = _make()
+    controller.speech_level.emit(0.42)
+    assert overlay.levels == [pytest.approx(0.42)]
+
+
+def test_on_input_volume_changed_forwards_to_setter() -> None:
+    overlay = _FakeOverlay()
+    calls: list[int] = []
+    controller = Controller(
+        overlay,
+        _FakeClaude([]),
+        RollingContext(),
+        runner=lambda work: work(),
+        set_input_volume=lambda percent: calls.append(percent) or True,
+    )
+    controller.on_input_volume_changed(42)
+    assert calls == [42]

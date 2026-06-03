@@ -57,6 +57,7 @@ class MicrophoneCapture:  # pylint: disable=too-many-instance-attributes
         *,
         on_partial: Callable[[np.ndarray], None],
         on_final: Callable[[np.ndarray], None],
+        on_level: Optional[Callable[[float], None]] = None,
         sample_rate: int = 16000,
         partial_seconds: float = 1.2,
         silence_seconds: float = 0.7,
@@ -73,6 +74,9 @@ class MicrophoneCapture:  # pylint: disable=too-many-instance-attributes
             on_final (Callable[[np.ndarray], None]): Called once with the
                 complete utterance (mono float32) when trailing silence reaches
                 ``silence_seconds`` and speech has been buffered.
+            on_level (Optional[Callable[[float], None]]): Called with the peak
+                amplitude (0..1) of every captured block — drives a live input-level
+                meter. ``None`` (default) disables level reporting.
             sample_rate (int): Capture sample rate in Hz. Defaults to ``16000``.
             partial_seconds (float): Spacing, in seconds of accumulated audio,
                 between successive ``on_partial`` emissions. Defaults to ``1.2``.
@@ -88,6 +92,7 @@ class MicrophoneCapture:  # pylint: disable=too-many-instance-attributes
         """
         self._on_partial = on_partial
         self._on_final = on_final
+        self._on_level = on_level
         self.sample_rate = sample_rate
         self.partial_seconds = partial_seconds
         self.silence_seconds = silence_seconds
@@ -204,6 +209,10 @@ class MicrophoneCapture:  # pylint: disable=too-many-instance-attributes
         samples = np.asarray(block, dtype=np.float32).reshape(-1)
         if samples.size == 0:
             return
+
+        # Report the block's peak amplitude (drives the live input-level meter).
+        if self._on_level is not None:
+            self._on_level(float(np.max(np.abs(samples))))
 
         is_silent = self._is_silent(samples)
 

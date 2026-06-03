@@ -18,6 +18,7 @@ from typing import Callable, Optional, Protocol
 from PyQt6 import QtWidgets
 from PyQt6.QtCore import QObject, pyqtSignal
 
+from src.audio.system_volume import set_input_volume as default_set_input_volume
 from src.core.context import RollingContext
 from src.helpers.logger import get_logger
 from src.llm.claude import ClaudeClient
@@ -47,6 +48,7 @@ class Controller(QObject):
     answer_token = pyqtSignal(str)
     partial_speech = pyqtSignal(str)
     final_speech = pyqtSignal(str)
+    speech_level = pyqtSignal(float)
 
     def __init__(
         self,
@@ -58,6 +60,7 @@ class Controller(QObject):
         mode: Mode = Mode.COACH,
         runner: Optional[Runner] = None,
         hide_delay: float = HIDE_BEFORE_CAPTURE_SECONDS,
+        set_input_volume: Callable[[int], bool] = default_set_input_volume,
     ) -> None:
         """Wires the controller to its collaborators.
 
@@ -70,6 +73,8 @@ class Controller(QObject):
             runner (Optional[Runner]): Executes the streaming work; defaults to a
                 daemon thread. Tests inject a synchronous runner.
             hide_delay (float): Seconds to wait after hiding the overlay before capture.
+            set_input_volume (Callable[[int], bool]): Applies a system microphone
+                volume (0..100); defaults to the macOS ``osascript`` implementation.
         """
         super().__init__()
         self._overlay = overlay
@@ -79,10 +84,12 @@ class Controller(QObject):
         self.mode = mode
         self._runner: Runner = runner or self._spawn_thread
         self._hide_delay = hide_delay
+        self._set_input_volume = set_input_volume
         self._speech: Optional[SpeechControl] = None
         self.answer_token.connect(self._overlay.append_answer)
         self.partial_speech.connect(self._on_partial_speech)
         self.final_speech.connect(self._on_final_speech)
+        self.speech_level.connect(self._overlay.set_input_level)
 
     # ------------------------------------------------------------------ #
     # Entry points (the single "on_capture" surface from the spec)
@@ -143,6 +150,15 @@ class Controller(QObject):
         logger.info("Microphone %s", "on" if listening else "off")
         if self._speech is not None:
             self._speech.set_listening(listening)
+
+    def on_input_volume_changed(self, percent: int) -> None:
+        """Mic-volume slider entry: apply a new system input volume.
+
+        Args:
+            percent (int): Desired microphone input volume in percent (0..100).
+        """
+        logger.info("Input volume -> %d%%", percent)
+        self._set_input_volume(percent)
 
     # ------------------------------------------------------------------ #
     # Live speech (STT) slots — invoked on the UI thread via signals

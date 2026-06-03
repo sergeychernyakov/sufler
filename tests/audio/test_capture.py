@@ -393,6 +393,25 @@ def test_current_utterance_is_empty_when_nothing_buffered(callbacks: tuple[_Reco
 
 
 # --------------------------------------------------------------------------- #
+# Input-level reporting
+# --------------------------------------------------------------------------- #
+def test_ingest_reports_block_peak_level(callbacks: tuple[_Recorder, _Recorder]) -> None:
+    """Each non-empty block reports its peak amplitude through ``on_level``."""
+    # Arrange
+    on_partial, on_final = callbacks
+    levels: List[float] = []
+    capture = MicrophoneCapture(
+        on_partial=on_partial, on_final=on_final, on_level=levels.append, sample_rate=SAMPLE_RATE
+    )
+
+    # Act
+    capture._ingest(_loud(100))  # constant 0.2 -> peak 0.2
+
+    # Assert
+    assert levels == [pytest.approx(0.2, abs=1e-6)]
+
+
+# --------------------------------------------------------------------------- #
 # Stream lifecycle (mocked sounddevice)
 # --------------------------------------------------------------------------- #
 def test_start_opens_mocked_input_stream(callbacks: tuple[_Recorder, _Recorder]) -> None:

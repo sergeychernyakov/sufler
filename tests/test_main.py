@@ -50,7 +50,7 @@ def test_maybe_start_speech_starts_pipeline(monkeypatch) -> None:
     started: dict[str, bool] = {}
 
     class _FakePipeline:
-        def __init__(self, engine, *, on_partial_text, on_final_text, device=None) -> None:
+        def __init__(self, engine, *, on_partial_text, on_final_text, on_level=None, device=None) -> None:
             started["init"] = True
 
         def start(self) -> None:
