@@ -30,6 +30,8 @@ line under `[Unreleased]`**.
   (`langchain-groq`, default Llama 4 Scout) stream answers and **read screenshots**, mirroring the
   Claude client; configured via `SUFLER_GEMINI_API_KEY` / `SUFLER_GROQ_API_KEY` and the matching
   `*_MODEL`. _feat(llm)_
+- **"Thinking" spinner** — an animated indicator in the answer area while the LLM generates,
+  replaced by the first streamed token (and showing "(пустой ответ)" if nothing comes back). _feat(ui)_
 
 ### Fixed
 - **App icon transparency** — the source icon was flattened to RGB, so its corners rendered as

@@ -49,6 +49,7 @@ class Controller(QObject):
     partial_speech = pyqtSignal(str)
     final_speech = pyqtSignal(str)
     speech_level = pyqtSignal(float)
+    stream_finished = pyqtSignal()
 
     def __init__(
         self,
@@ -90,6 +91,7 @@ class Controller(QObject):
         self.partial_speech.connect(self._on_partial_speech)
         self.final_speech.connect(self._on_final_speech)
         self.speech_level.connect(self._overlay.set_input_level)
+        self.stream_finished.connect(self._overlay.end_answer)
 
     # ------------------------------------------------------------------ #
     # Entry points (the single "on_capture" surface from the spec)
@@ -209,8 +211,10 @@ class Controller(QObject):
                 ):
                     self.answer_token.emit(token)
             except Exception:  # noqa: BLE001  # pylint: disable=broad-exception-caught
-                logger.exception("Claude stream failed")
-                self.answer_token.emit("[ошибка запроса к Claude]")
+                logger.exception("Answer stream failed")
+                self.answer_token.emit("[ошибка запроса к LLM]")
+            finally:
+                self.stream_finished.emit()
 
         self._runner(work)
 
