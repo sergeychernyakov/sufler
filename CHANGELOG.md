@@ -15,6 +15,9 @@ line under `[Unreleased]`**.
 - **Live transcript** panel with a show/hide toggle; a **Send** button (⏎) beside the manual
   input; the capture button is a vector **camera icon**; the window is draggable by its body. _feat(ui)_
 - **`bin/make_app`** — builds a double-clickable macOS `sufler.app` launcher. _chore(tooling)_
+- **App icon** — `assets/icon.png` is rendered into a multi-resolution `sufler.icns` (16–1024 px,
+  1x + 2x) by `bin/make_app` and referenced from `Info.plist` (`CFBundleIconFile`); it is also set
+  on the running window / Dock tile via `app.setWindowIcon`. _feat(ui)_
 
 ### Fixed
 - **Real-time STT now works reliably** (it previously produced empty/garbled output, stalled,

@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+from pathlib import Path
 from typing import Optional
 
-from PyQt6 import QtWidgets
+from PyQt6 import QtGui, QtWidgets
 
 from src.audio.devices import resolve_input_device
 from src.audio.pipeline import SpeechPipeline
@@ -28,6 +29,10 @@ from src.models.enums import Mode, SttEngine
 from src.ui.overlay import Overlay
 
 logger = get_logger(__name__)
+
+#: App icon (also bundled as sufler.icns by ``bin/make_app``). Setting it on the
+#: QApplication gives the window and Dock tile a real icon when run via ``python main.py``.
+_ICON_PATH = Path(__file__).resolve().parent / "assets" / "icon.png"
 
 
 def _resolve_mode() -> Mode:
@@ -123,6 +128,8 @@ def main() -> int:  # pragma: no cover - launches the blocking Qt event loop
     """Builds the app, starts hotkeys and runs the Qt event loop."""
     logger.info("Starting sufler")
     app = QtWidgets.QApplication(sys.argv)
+    if _ICON_PATH.exists():
+        app.setWindowIcon(QtGui.QIcon(str(_ICON_PATH)))
     overlay, controller, hotkeys = build_app()
     logger.info("sufler ready (mode=%s)", controller.mode.value)
 
