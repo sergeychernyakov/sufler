@@ -166,3 +166,6 @@ cython_debug/
 tmp/*
 media/*
 compare.py
+
+# Claude Code agent worktrees (transient)
+.claude/worktrees/
