@@ -9,6 +9,8 @@ line under `[Unreleased]`**.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-03
+
 ### Added
 - **Normal-window UI** (default): native title bar (drag + close-to-quit), always-on-top;
   the frameless stealth overlay is now opt-in via `SUFLER_STEALTH=true`. _feat(ui)_
