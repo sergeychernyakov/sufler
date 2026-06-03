@@ -37,6 +37,7 @@ class Config:
     # Speech-to-text (Phase 5+)
     stt_engine: str = field(default_factory=lambda: os.getenv("SUFLER_STT_ENGINE", "mlx"))
     stt_model: str = field(default_factory=lambda: os.getenv("SUFLER_STT_MODEL", ""))
+    stt_language: str = field(default_factory=lambda: os.getenv("SUFLER_STT_LANGUAGE", ""))
     loopback_device: str = field(default_factory=lambda: os.getenv("SUFLER_LOOPBACK_DEVICE", ""))
 
     # UI

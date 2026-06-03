@@ -305,3 +305,69 @@ def test_create_engine_mlx_falls_back_to_default_model(monkeypatch: pytest.Monke
     # Assert
     assert isinstance(engine, MlxWhisperEngine)
     assert engine.model == DEFAULT_MLX_MODEL
+
+
+# --------------------------------------------------------------------------- #
+# Language selection (SUFLER_STT_LANGUAGE)
+# --------------------------------------------------------------------------- #
+def test_mlx_transcribe_passes_language(fake_mlx: _FakeMlxWhisper) -> None:
+    """A pinned language is forwarded to ``mlx_whisper.transcribe``."""
+    # Arrange
+    engine = MlxWhisperEngine(language="ru")
+
+    # Act
+    engine.transcribe(_fake_audio())
+
+    # Assert
+    assert fake_mlx.calls[0]["kwargs"]["language"] == "ru"
+
+
+def test_mlx_transcribe_language_defaults_to_auto(fake_mlx: _FakeMlxWhisper) -> None:
+    """With no language, transcribe passes ``language=None`` (Whisper auto-detects)."""
+    # Arrange
+    engine = MlxWhisperEngine()
+
+    # Act
+    engine.transcribe(_fake_audio())
+
+    # Assert
+    assert fake_mlx.calls[0]["kwargs"]["language"] is None
+
+
+def test_create_engine_mlx_uses_configured_language(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``config.stt_language`` is passed to the MLX engine when set."""
+    # Arrange
+    monkeypatch.setattr(stt.config, "stt_language", "en")
+
+    # Act
+    engine = create_engine(SttEngine.MLX)
+
+    # Assert
+    assert isinstance(engine, MlxWhisperEngine)
+    assert engine.language == "en"
+
+
+def test_create_engine_explicit_language_overrides_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An explicit ``language=`` kwarg wins over ``config.stt_language``."""
+    # Arrange
+    monkeypatch.setattr(stt.config, "stt_language", "en")
+
+    # Act
+    engine = create_engine(SttEngine.MLX, language="ru")
+
+    # Assert
+    assert isinstance(engine, MlxWhisperEngine)
+    assert engine.language == "ru"
+
+
+def test_create_engine_mlx_language_defaults_to_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With ``config.stt_language`` empty, the engine auto-detects (language ``None``)."""
+    # Arrange
+    monkeypatch.setattr(stt.config, "stt_language", "")
+
+    # Act
+    engine = create_engine(SttEngine.MLX)
+
+    # Assert
+    assert isinstance(engine, MlxWhisperEngine)
+    assert engine.language is None

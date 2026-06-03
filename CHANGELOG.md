@@ -14,6 +14,9 @@ line under `[Unreleased]`**.
   shows a filled green mic while listening and a dimmed, slashed mic when muted; muting closes
   the input stream (so the macOS microphone indicator turns off too). It is disabled when no STT
   backend is available. _feat(ui)_
+- **Configurable STT language** via `SUFLER_STT_LANGUAGE` (empty = auto-detect, best for mixed
+  ru+en speech; set `ru` / `en` to pin a single language and drop auto-detection garbage). The
+  code default already targets `whisper-large-v3-turbo`. _feat(config)_
 
 ### Fixed
 - **App icon transparency** — the source icon was flattened to RGB, so its corners rendered as
