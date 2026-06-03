@@ -389,6 +389,7 @@ def test_create_engine_mlx_language_defaults_to_none(monkeypatch: pytest.MonkeyP
     [
         ("Субтитры сделал DimaTorzok", True),
         ("Субтитры создавал DimaTorzok", True),
+        ("Субтитры подогнал «Симон»", True),
         ("Продолжение следует...", True),
         ("Спасибо за просмотр!", True),
         ("You", True),
