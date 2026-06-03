@@ -21,7 +21,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 from src.audio.system_volume import set_input_volume as default_set_input_volume
 from src.core.context import RollingContext
 from src.helpers.logger import get_logger
-from src.llm.claude import ClaudeClient
+from src.llm.factory import AnswerClient
 from src.models.enums import Mode
 from src.ui.overlay import Overlay
 from src.vision.screenshot import grab_screen as default_grab_screen
@@ -53,7 +53,7 @@ class Controller(QObject):
     def __init__(
         self,
         overlay: Overlay,
-        claude: ClaudeClient,
+        claude: AnswerClient,
         context: RollingContext,
         *,
         grab_screen: Callable[[], str] = default_grab_screen,
@@ -66,7 +66,7 @@ class Controller(QObject):
 
         Args:
             overlay (Overlay): The stealth overlay to drive.
-            claude (ClaudeClient): The streaming Claude client.
+            claude (AnswerClient): The streaming answer client (Claude or Gemini).
             context (RollingContext): The rolling conversation context.
             grab_screen (Callable[[], str]): Screen-capture function returning base64 PNG.
             mode (Mode): Initial answer mode.

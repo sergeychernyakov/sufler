@@ -88,7 +88,7 @@ class ClaudeClient:
         if client is not None:
             self._client: Any = client
         else:
-            self._client = anthropic.Anthropic(api_key=api_key or config.anthropic_api_key)
+            self._client = anthropic.Anthropic(api_key=api_key or config.anthropic_api_key or "MISSING_API_KEY")
 
     @staticmethod
     def build_system_prompt(mode: Mode) -> str:
