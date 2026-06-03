@@ -58,6 +58,56 @@ def test_begin_answer_clears_previous_answer(overlay: Overlay) -> None:
     assert overlay.answer_text() == ""
 
 
+def test_begin_answer_starts_thinking_spinner(overlay: Overlay) -> None:
+    """begin_answer starts the spinner timer; a tick shows a 'думаю' indicator."""
+    # Act
+    overlay.begin_answer()
+    # Assert
+    assert overlay._thinking_timer.isActive() is True
+    overlay._on_thinking_tick()
+    assert "думаю" in overlay.answer_text()
+
+
+def test_first_token_replaces_thinking_spinner(overlay: Overlay) -> None:
+    """The first token stops the spinner and clears its 'думаю' placeholder."""
+    # Arrange
+    overlay.begin_answer()
+    overlay._on_thinking_tick()  # spinner visible
+
+    # Act
+    overlay.append_answer("Ответ")
+
+    # Assert
+    assert overlay._thinking_timer.isActive() is False
+    assert overlay.answer_text() == "Ответ"
+
+
+def test_end_answer_without_token_marks_empty(overlay: Overlay) -> None:
+    """end_answer with no tokens stops the spinner and shows an empty-answer note."""
+    # Arrange
+    overlay.begin_answer()
+
+    # Act
+    overlay.end_answer()
+
+    # Assert
+    assert overlay._thinking_timer.isActive() is False
+    assert overlay.answer_text() == "(пустой ответ)"
+
+
+def test_end_answer_after_token_keeps_answer(overlay: Overlay) -> None:
+    """end_answer after tokens leaves the streamed answer intact."""
+    # Arrange
+    overlay.begin_answer()
+    overlay.append_answer("Готовый ответ")
+
+    # Act
+    overlay.end_answer()
+
+    # Assert
+    assert overlay.answer_text() == "Готовый ответ"
+
+
 def test_append_answer_accumulates_tokens(overlay: Overlay) -> None:
     """``append_answer`` concatenates streamed tokens in order."""
     # Arrange

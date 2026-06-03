@@ -39,6 +39,9 @@ FONT_SCALE_STEP: Final[float] = 0.1
 FONT_SCALE_MIN: Final[float] = 0.7
 FONT_SCALE_MAX: Final[float] = 2.5
 
+# Braille spinner frames for the "thinking" indicator shown before the first answer token.
+_SPINNER_FRAMES: Final[str] = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
 # Default auto-hide window (seconds); the spec asks for 10-15 s.
 DEFAULT_AUTO_HIDE_SECONDS: Final[float] = 12.0
 
@@ -157,6 +160,12 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._auto_hide_timer = QtCore.QTimer(self)
         self._auto_hide_timer.setSingleShot(True)
         self._auto_hide_timer.timeout.connect(self.panic_hide)
+
+        # "Thinking" spinner shown in the answer area until the first LLM token arrives.
+        self._got_answer_token: bool = False
+        self._thinking_frame: int = 0
+        self._thinking_timer = QtCore.QTimer(self)
+        self._thinking_timer.timeout.connect(self._on_thinking_tick)
 
         self._build_window()
         self._build_widgets()
@@ -595,16 +604,34 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         return self._question_label.text()
 
     def begin_answer(self) -> None:
-        """Clears the answer area in preparation for a new streamed answer."""
+        """Clears the answer area and starts the 'thinking' spinner (until the first token)."""
         self._answer_label.clear()
+        self._got_answer_token = False
+        self._thinking_frame = 0
+        self._thinking_timer.start(110)
 
     def append_answer(self, token: str) -> None:
-        """Appends a single streamed token to the answer area.
+        """Appends a streamed token, replacing the 'thinking' spinner on the first one.
 
         Args:
             token (str): The next token (or chunk) of the answer to append.
         """
+        if not self._got_answer_token:
+            self._thinking_timer.stop()
+            self._answer_label.clear()
+            self._got_answer_token = True
         self._answer_label.setText(self._answer_label.text() + token)
+
+    def end_answer(self) -> None:
+        """Ends a streamed answer: stops the spinner and notes an empty response."""
+        self._thinking_timer.stop()
+        if not self._got_answer_token:
+            self._answer_label.setText("(пустой ответ)")
+
+    def _on_thinking_tick(self) -> None:
+        """Advances the 'thinking' spinner shown before the first answer token arrives."""
+        self._thinking_frame = (self._thinking_frame + 1) % len(_SPINNER_FRAMES)
+        self._answer_label.setText(f"{_SPINNER_FRAMES[self._thinking_frame]}  думаю…")
 
     def answer_text(self) -> str:
         """Returns the full answer accumulated so far.
@@ -813,6 +840,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
     def panic_hide(self) -> None:
         """Instantly hides the entire overlay (panic control)."""
         self._auto_hide_timer.stop()
+        self._thinking_timer.stop()
         self.hide()
         logger.debug("Panic hide triggered")
 

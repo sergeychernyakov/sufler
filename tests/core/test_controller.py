@@ -18,6 +18,7 @@ class _FakeOverlay:
         self.transcript: list[str] = []
         self.levels: list[float] = []
         self.begun = 0
+        self.ended = 0
         self.hidden = 0
         self.shown = 0
         self.panicked = 0
@@ -28,6 +29,9 @@ class _FakeOverlay:
 
     def begin_answer(self) -> None:
         self.begun += 1
+
+    def end_answer(self) -> None:
+        self.ended += 1
 
     def append_answer(self, token: str) -> None:
         self.answer_tokens.append(token)
