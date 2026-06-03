@@ -44,8 +44,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key><string>sufler</string>
-  <key>CFBundleDisplayName</key><string>sufler</string>
+  <key>CFBundleName</key><string>Sufler</string>
+  <key>CFBundleDisplayName</key><string>Sufler</string>
   <key>CFBundleIdentifier</key><string>com.sergeychernyakov.sufler</string>
   <key>CFBundleVersion</key><string>0.2.0</string>
   <key>CFBundleShortVersionString</key><string>0.2.0</string>
@@ -53,7 +53,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleExecutable</key><string>sufler</string>
 $ICON_PLIST_ENTRY
   <key>NSHighResolutionCapable</key><true/>
-  <key>NSMicrophoneUsageDescription</key><string>sufler transcribes interview audio locally.</string>
+  <key>NSMicrophoneUsageDescription</key><string>Sufler transcribes interview audio locally.</string>
 </dict>
 </plist>
 PLIST
