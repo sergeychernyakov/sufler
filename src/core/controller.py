@@ -118,6 +118,10 @@ class Controller(QObject):
         question = text.strip()
         if not question:
             return
+        # A single bare word is treated as "what is …?" (a definition lookup).
+        if " " not in question and "?" not in question:
+            prefix = "What is" if config.answer_lang.strip().lower() == "en" else "Что такое"
+            question = f"{prefix} {question}?"
         logger.info("on_submit_text (%d chars)", len(question))
         self._context.set_question(question)
         self._overlay.set_question(question)
