@@ -143,6 +143,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
     back_requested = pyqtSignal()
     forward_requested = pyqtSignal()
     model_changed = pyqtSignal(str)
+    language_changed = pyqtSignal(str)
 
     def __init__(self, parent: QtWidgets.QWidget | None = None, *, stealth: bool = False) -> None:
         """Builds the overlay window and lays out widgets.
@@ -324,6 +325,17 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._model_combo.setObjectName("modelCombo")
         self._model_combo.setCursor(Qt.CursorShape.PointingHandCursor)
 
+        self._lang_combo = QtWidgets.QComboBox(self)
+        self._lang_combo.setObjectName("langCombo")
+        self._lang_combo.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._lang_combo.addItems(["ru", "en"])
+        self._lang_combo.setToolTip("Язык ответа модели")
+
+        self._copy_button = QtWidgets.QPushButton("📋", self)
+        self._copy_button.setObjectName("copyButton")
+        self._copy_button.setToolTip("Скопировать вопрос и ответ")
+        self._copy_button.setCursor(Qt.CursorShape.PointingHandCursor)
+
         self._capture_button = QtWidgets.QPushButton(self)
         self._capture_button.setObjectName("captureButton")
         self._capture_button.setIcon(self._capture_icon())
@@ -386,6 +398,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         nav_row.setSpacing(6)
         nav_row.addWidget(self._back_button)
         nav_row.addWidget(self._question_label, stretch=1)
+        nav_row.addWidget(self._copy_button)
         nav_row.addWidget(self._forward_button)
         layout.addLayout(nav_row)
 
@@ -411,6 +424,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         model_row.setSpacing(6)
         model_row.addWidget(self._model_label)
         model_row.addWidget(self._model_combo, stretch=1)
+        model_row.addWidget(self._lang_combo)
         layout.addLayout(model_row)
 
         volume_row = QtWidgets.QHBoxLayout()
@@ -431,7 +445,9 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         """Wires child-widget signals to the overlay's public signals."""
         self._back_button.clicked.connect(self.back_requested)
         self._forward_button.clicked.connect(self.forward_requested)
+        self._copy_button.clicked.connect(self._on_copy_clicked)
         self._model_combo.textActivated.connect(self.model_changed)
+        self._lang_combo.textActivated.connect(self.language_changed)
         self._answer_label.linkActivated.connect(self._on_answer_link)
         self._capture_button.clicked.connect(self._on_capture_clicked)
         self._mic_button.clicked.connect(self._on_mic_clicked)
@@ -519,7 +535,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
                 font-size: 13px;
             }
             QPushButton#captureButton, QPushButton#sendButton, QPushButton#micButton,
-            QPushButton#backButton, QPushButton#forwardButton {
+            QPushButton#backButton, QPushButton#forwardButton, QPushButton#copyButton {
                 background-color: rgba(60, 60, 70, 230);
                 border: 1px solid rgba(120, 120, 140, 200);
                 border-radius: 6px;
@@ -527,10 +543,10 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
                 font-size: 15px;
             }
             QPushButton#captureButton:hover, QPushButton#sendButton:hover, QPushButton#micButton:hover,
-            QPushButton#backButton:hover, QPushButton#forwardButton:hover {
+            QPushButton#backButton:hover, QPushButton#forwardButton:hover, QPushButton#copyButton:hover {
                 background-color: rgba(80, 80, 92, 240);
             }
-            QComboBox#modelCombo {
+            QComboBox#modelCombo, QComboBox#langCombo {
                 background-color: rgba(40, 40, 48, 230);
                 border: 1px solid rgba(110, 110, 130, 200);
                 border-radius: 6px;
@@ -754,6 +770,37 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
             str: The model id shown in the selector.
         """
         return self._model_combo.currentText()
+
+    def set_language(self, language: str) -> None:
+        """Selects the output language in the selector (no signal emitted).
+
+        Args:
+            language (str): The language code (e.g. ``ru`` / ``en``).
+        """
+        self._lang_combo.blockSignals(True)
+        self._lang_combo.setCurrentText(language)
+        self._lang_combo.blockSignals(False)
+
+    def selected_language(self) -> str:
+        """Returns the currently selected output-language code.
+
+        Returns:
+            str: The language code shown in the selector.
+        """
+        return self._lang_combo.currentText()
+
+    def _on_copy_clicked(self) -> None:
+        """Copies the current question and answer (plain text) to the clipboard."""
+        parts: list[str] = []
+        question = self._question_label.text().strip()
+        if question:
+            parts.append(question)
+        if self._answer_raw.strip():
+            parts.append(self._answer_raw.replace("**", ""))
+        clipboard = QtWidgets.QApplication.clipboard()
+        if clipboard is not None:
+            clipboard.setText("\n\n".join(parts))
+        logger.debug("Copied question + answer to clipboard")
 
     def _render_answer(self, raw: str) -> None:
         """Stores ``raw`` and renders it as rich text with clickable ``**term**`` links."""

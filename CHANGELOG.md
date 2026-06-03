@@ -40,6 +40,10 @@ line under `[Unreleased]`**.
   (←)** / **forward (→)** buttons at the top of the window move through the history. _feat(ui)_
 - **In-window model selector** — a dropdown switches the answer model on the fly (the active
   provider's free models). _feat(ui)_
+- **Output-language selector** — a dropdown (right of the model selector) sets the answer language
+  (`ru` / `en`, default `ru`), wired into the system prompt via `SUFLER_ANSWER_LANG`. _feat(ui)_
+- **Copy button** (📋) — copies the current question + answer (markdown markers stripped) to the
+  clipboard. _feat(ui)_
 - **Resizable recognition area** — answer and transcript share a draggable splitter; drag its handle
   (the transcript's top border) to enlarge the recognition feed. _feat(ui)_
 - **Longer answers** — up to **7** points/theses by default (was ~3); configurable via

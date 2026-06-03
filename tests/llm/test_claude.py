@@ -167,6 +167,19 @@ def test_system_prompt_instructs_russian_and_english_terms(mode: Mode) -> None:
     assert "English" in prompt  # technical terms stay in English
 
 
+def test_system_prompt_uses_configured_answer_language(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The answer-language clause follows ``config.answer_lang`` (e.g. en)."""
+    # Arrange
+    monkeypatch.setattr(config, "answer_lang", "en")
+
+    # Act
+    prompt = ClaudeClient.build_system_prompt(Mode.ANSWER)
+
+    # Assert
+    assert "English" in prompt
+    assert "русском" not in prompt
+
+
 def test_system_prompt_passed_to_stream_matches_mode(claude: ClaudeClient, fake_client: _FakeAnthropic) -> None:
     """stream_answer forwards the mode-specific system prompt to the SDK."""
     # Act
