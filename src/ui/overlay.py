@@ -307,6 +307,14 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._answer_label.setOpenExternalLinks(False)
         self._answer_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
+        # The answer scrolls when it does not fit (long answers were clipped before).
+        self._answer_scroll = QtWidgets.QScrollArea(self)
+        self._answer_scroll.setObjectName("answerScroll")
+        self._answer_scroll.setWidget(self._answer_label)
+        self._answer_scroll.setWidgetResizable(True)
+        self._answer_scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        self._answer_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
         self._back_button = QtWidgets.QPushButton("←", self)
         self._back_button.setObjectName("backButton")
         self._back_button.setToolTip("Назад")
@@ -330,6 +338,8 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._lang_combo.setCursor(Qt.CursorShape.PointingHandCursor)
         self._lang_combo.addItems(["ru", "en"])
         self._lang_combo.setToolTip("Язык ответа модели")
+        self._lang_combo.setMinimumWidth(64)
+        self._lang_combo.setSizeAdjustPolicy(QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToContents)
 
         self._copy_button = QtWidgets.QPushButton("📋", self)
         self._copy_button.setObjectName("copyButton")
@@ -405,7 +415,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         # Answer + transcript share a draggable vertical splitter — drag the handle
         # (the recognition area's top border) to resize it.
         self._body_splitter = QtWidgets.QSplitter(Qt.Orientation.Vertical, self)
-        self._body_splitter.addWidget(self._answer_label)
+        self._body_splitter.addWidget(self._answer_scroll)
         self._body_splitter.addWidget(self._transcript)
         self._body_splitter.setStretchFactor(0, 3)
         self._body_splitter.setStretchFactor(1, 1)
@@ -689,6 +699,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._answer_raw = ""
         self._thinking_frame = 0
         self._thinking_timer.start(110)
+        self._scroll_answer_to_top()
 
     def append_answer(self, token: str) -> None:
         """Appends a streamed token (plain text), replacing the spinner on the first one.
@@ -803,10 +814,29 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         logger.debug("Copied question + answer to clipboard")
 
     def _render_answer(self, raw: str) -> None:
-        """Stores ``raw`` and renders it as rich text with clickable ``**term**`` links."""
-        self._answer_raw = raw
+        """Stores ``raw`` (with any <think> reasoning removed) and renders it with links."""
+        self._answer_raw = self._strip_think(raw)
         self._answer_label.setTextFormat(Qt.TextFormat.RichText)
-        self._answer_label.setText(self._linkify(raw))
+        self._answer_label.setText(self._linkify(self._answer_raw))
+        self._scroll_answer_to_top()
+
+    @staticmethod
+    def _strip_think(raw: str) -> str:
+        """Removes ``<think>…</think>`` reasoning blocks that some models emit.
+
+        Args:
+            raw (str): The raw answer text.
+
+        Returns:
+            str: The answer without any think blocks, stripped.
+        """
+        return re.sub(r"<think>.*?</think>\s*", "", raw, flags=re.DOTALL).strip()
+
+    def _scroll_answer_to_top(self) -> None:
+        """Scrolls the answer area back to the top."""
+        bar = self._answer_scroll.verticalScrollBar()
+        if bar is not None:
+            bar.setValue(0)
 
     @staticmethod
     def _linkify(raw: str) -> str:

@@ -50,6 +50,11 @@ line under `[Unreleased]`**.
   `SUFLER_ANSWER_POINTS`. _feat(controller)_
 
 ### Fixed
+- **Scrollable answer area** — long answers were clipped; the answer now scrolls inside its pane. _fix(ui)_
+- **Hide model reasoning** — `<think>…</think>` blocks (emitted by some models) are stripped from
+  the answer. _fix(ui)_
+- **Language selector width** — the `ru`/`en` dropdown was too narrow (clipped, worse when text was
+  enlarged); it now has a minimum width and sizes to its content. _fix(ui)_
 - **Question/answer text is selectable** (copyable) in the window — the question label was not
   selectable before. _fix(ui)_
 - **App icon transparency** — the source icon was flattened to RGB, so its corners rendered as
