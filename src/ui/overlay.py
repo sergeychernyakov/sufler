@@ -60,7 +60,7 @@ class _LevelMeter(QtWidgets.QWidget):
     useful range, and the top bars turn amber/red to warn of clipping.
     """
 
-    _BARS: Final[int] = 22
+    _BARS: Final[int] = 12
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         """Builds an empty (zero-level) meter."""
