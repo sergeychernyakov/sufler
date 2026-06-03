@@ -1,50 +1,93 @@
 # main.py
 
-"""
-Main entry point for the application.
+"""Application entry point.
 
-This module serves as the primary entry point for running the application.
-It initializes the necessary components and starts the main program flow.
+Wires configuration, the stealth overlay, the Claude client, rolling context, the
+controller and global hotkeys into a runnable app. ``build_app`` performs the
+wiring (and is unit-tested); ``main`` owns the blocking Qt event loop.
 """
+
+from __future__ import annotations
 
 import sys
+from typing import Optional
 
+from PyQt6 import QtWidgets
+
+from src.config import config
+from src.core.context import RollingContext
+from src.core.controller import Controller
+from src.core.hotkeys import HotkeyManager
 from src.helpers.logger import get_logger
+from src.llm.claude import ClaudeClient
+from src.models.enums import Mode
+from src.ui.overlay import Overlay
 
 logger = get_logger(__name__)
 
 
-def main() -> None:
-    """
-    Main function that runs the application.
+def _resolve_mode() -> Mode:
+    """Returns the configured answer mode, defaulting to coach on bad input."""
+    try:
+        return Mode(config.mode)
+    except ValueError:
+        logger.warning("Unknown SUFLER_MODE=%r; falling back to coach", config.mode)
+        return Mode.COACH
 
-    This function initializes the application, sets up logging,
-    and runs the main program logic.
+
+def build_app(*, claude: Optional[ClaudeClient] = None) -> tuple[Overlay, Controller, HotkeyManager]:
+    """Constructs and wires every component without starting the event loop.
+
+    Args:
+        claude (Optional[ClaudeClient]): Injected client (tests); defaults to a
+            real :class:`ClaudeClient` built from configuration.
 
     Returns:
-        None
+        tuple[Overlay, Controller, HotkeyManager]: The wired top-level objects.
     """
-    logger.info("Starting application")
+    if not config.anthropic_api_key:
+        logger.warning("ANTHROPIC_API_KEY is empty — captures will fail until it is set in .env")
+
+    overlay = Overlay()
+    claude_client = claude or ClaudeClient(api_key=config.anthropic_api_key or "MISSING_API_KEY")
+    context = RollingContext()
+    controller = Controller(overlay, claude_client, context, mode=_resolve_mode())
+
+    overlay.capture_requested.connect(controller.on_capture)
+    overlay.text_submitted.connect(controller.on_submit_text)
+
+    hotkeys = HotkeyManager(
+        capture_hotkey=config.hotkey_capture,
+        panic_hotkey=config.hotkey_panic,
+        last_hotkey=config.hotkey_last,
+    )
+    hotkeys.capture.connect(controller.on_capture)
+    hotkeys.panic.connect(controller.panic)
+    hotkeys.answer_last.connect(controller.on_answer_last)
+
+    return overlay, controller, hotkeys
+
+
+def main() -> int:  # pragma: no cover - launches the blocking Qt event loop
+    """Builds the app, starts hotkeys and runs the Qt event loop."""
+    logger.info("Starting sufler")
+    app = QtWidgets.QApplication(sys.argv)
+    overlay, controller, hotkeys = build_app()
+    logger.info("sufler ready (mode=%s)", controller.mode.value)
 
     try:
-        # Main application logic would go here
-        logger.info("Application initialized successfully")
+        hotkeys.start()
+    except Exception:  # pylint: disable=broad-exception-caught
+        logger.exception("Could not start global hotkeys — grant Accessibility permission")
 
-        # Example: Run your main application logic
-        # from src.services import your_service
-        # your_service.run()
-
-        logger.info("Application running...")
-
-    except KeyboardInterrupt:
-        logger.info("Application interrupted by user")
-        sys.exit(0)
-    except RuntimeError as e:
-        logger.error("Application error: %s", str(e), exc_info=True)
-        sys.exit(1)
+    overlay.show()
+    overlay.arm_auto_hide()
+    try:
+        return app.exec()
     finally:
-        logger.info("Application shutting down")
+        hotkeys.stop()
+        logger.info("sufler shutting down")
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

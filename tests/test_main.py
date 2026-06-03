@@ -1,35 +1,33 @@
 # tests/test_main.py
 
-"""Smoke tests for the application entry point."""
+"""Tests for application wiring (``build_app``)."""
 
-import pytest
+from unittest.mock import MagicMock
 
-import main as main_module
-
-
-def _raise_on(trigger, exc):
-    """Build a ``logger.info`` replacement that raises ``exc`` for a given message."""
-
-    def _info(message, *args, **kwargs):
-        if trigger in str(message):
-            raise exc
-
-    return _info
+from main import build_app
+from src.core.controller import Controller
+from src.core.hotkeys import HotkeyManager
+from src.models.enums import Mode
+from src.ui.overlay import Overlay
 
 
-def test_main_happy_path_returns_none() -> None:
-    assert main_module.main() is None
+def test_build_app_wires_components(qtbot) -> None:
+    fake_claude = MagicMock()
+
+    overlay, controller, hotkeys = build_app(claude=fake_claude)
+    qtbot.addWidget(overlay)
+
+    assert isinstance(overlay, Overlay)
+    assert isinstance(controller, Controller)
+    assert isinstance(hotkeys, HotkeyManager)
+    assert controller.mode in (Mode.COACH, Mode.ANSWER)
+    assert len(hotkeys.bindings) == 3
 
 
-def test_main_exits_zero_on_keyboard_interrupt(monkeypatch) -> None:
-    monkeypatch.setattr(main_module.logger, "info", _raise_on("initialized", KeyboardInterrupt()))
-    with pytest.raises(SystemExit) as exc_info:
-        main_module.main()
-    assert exc_info.value.code == 0
+def test_build_app_uses_injected_claude(qtbot) -> None:
+    fake_claude = MagicMock()
 
+    _, controller, _ = build_app(claude=fake_claude)
 
-def test_main_exits_one_on_runtime_error(monkeypatch) -> None:
-    monkeypatch.setattr(main_module.logger, "info", _raise_on("initialized", RuntimeError("boom")))
-    with pytest.raises(SystemExit) as exc_info:
-        main_module.main()
-    assert exc_info.value.code == 1
+    # The injected client is the one the controller will stream from.
+    assert controller._claude is fake_claude  # noqa: SLF001  (white-box wiring check)
