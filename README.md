@@ -13,7 +13,8 @@ A Python desktop app (PyQt6 overlay + Claude + screenshots, later microphone STT
 - **Stealth overlay** (PyQt6): translucent, always-on-top, with click-through, opacity & compact modes and a panic-hide hotkey
 - **Screenshot → Claude**: multimodal request (text + screen image) with streamed answers; `coach` / `answer` modes
 - **Manual question input** + **global hotkeys** (incl. panic)
-- **Planned**: local STT (whisper.cpp / MLX), 30–60 s rolling context, loopback audio (BlackHole)
+- **Live STT** (MLX Whisper): microphone → partial/final transcription → 30–60 s rolling context
+- **Planned**: loopback audio — capture the interviewer's voice (BlackHole, Phase 7)
 
 **Engineering:**
 
@@ -160,10 +161,10 @@ To run the main application:
 python main.py
 ```
 
-`python main.py` launches the stealth overlay. Phases 1–4 and 6 are built; STT and
-loopback are planned (see [`docs/DEVELOPMENT_PLAN.md`](./docs/DEVELOPMENT_PLAN.md)).
+`python main.py` launches the stealth overlay. Phases 1–6 are built (incl. live STT via
+MLX Whisper); loopback (Phase 7) is planned (see [`docs/DEVELOPMENT_PLAN.md`](./docs/DEVELOPMENT_PLAN.md)).
 Requires `ANTHROPIC_API_KEY` in `.env` and macOS **Screen Recording** + **Accessibility**
-permissions (see above). It will:
+(+ **Microphone** for STT) permissions (see above). It will:
 1. Show a translucent, always-on-top overlay with a question field, a streamed answer
    area, a "📸 Скрин" button and a manual input field
 2. On capture (button or hotkey): hide the overlay, screenshot the screen, and stream
@@ -223,7 +224,7 @@ logger.error("An error occurred", exc_info=True)
 │   ├── ui/               # overlay.py (PyQt6, stealth) ✅
 │   ├── vision/           # screenshot.py (screencapture/mss) ✅
 │   ├── llm/              # claude.py (multimodal + streaming) ✅
-│   ├── audio/            # capture + stt (whisper.cpp/MLX)  — planned, Phase 5
+│   ├── audio/            # capture.py + stt.py + pipeline.py (MLX Whisper) ✅
 │   └── core/             # context.py + controller.py + hotkeys.py ✅
 ├── tests/                # Unit tests
 │   └── __init__.py
