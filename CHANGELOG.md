@@ -29,6 +29,10 @@ line under `[Unreleased]`**.
   which the bundle and `app.setWindowIcon` now carry through. _fix(ui)_
 - **Capture button icon** now reads as a camera (it looked like a suitcase) — redrawn with a
   lens-housing hump, concentric lens rings, and a flash dot. _fix(ui)_
+- **STT silently produced no text when the model cache was incomplete** — `_model_path` accepted
+  a metadata-only Hugging Face cache (weights missing) and never fetched them, so every
+  transcription raised and was swallowed. The full snapshot is now fetched first (completing a
+  partial cache); `local_files_only` is only an offline fallback. _fix(stt)_
 
 ## [0.2.0] - 2026-06-03
 

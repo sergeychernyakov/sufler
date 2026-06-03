@@ -137,11 +137,13 @@ class MlxWhisperEngine(STTEngine):
         self._local_path: Optional[str] = None
 
     def _model_path(self) -> str:
-        """Resolves the model to a local snapshot path once (no per-call HF fetch).
+        """Resolves the model to a complete local snapshot path once (cached per instance).
 
-        Re-resolving the Hugging Face repo on every ``transcribe`` call triggered a
-        slow network fetch each time; this resolves (downloading once if needed) to a
-        local directory and caches it on the instance.
+        Resolving the Hugging Face repo on every ``transcribe`` call triggered a slow
+        per-call fetch, so the result is cached on the instance. The full
+        :func:`snapshot_download` is tried first so any **missing files (e.g. the
+        weights)** are fetched — an incomplete cache (metadata only) otherwise makes
+        MLX fail to load the model. ``local_files_only`` is only an offline fallback.
 
         Returns:
             str: Local filesystem path to the model snapshot.
@@ -152,9 +154,11 @@ class MlxWhisperEngine(STTEngine):
             # The model repo is user-configured (SUFLER_STT_MODEL); pinning a revision per
             # arbitrary model is impractical, so B615 (unpinned download) is accepted here.
             try:
-                self._local_path = snapshot_download(self.model, local_files_only=True)  # nosec B615
-            except Exception:  # noqa: BLE001  # pylint: disable=broad-exception-caught
+                # Completes a partial cache (downloads missing weights); a full cache is reused.
                 self._local_path = snapshot_download(self.model)  # nosec B615
+            except Exception:  # noqa: BLE001  # pylint: disable=broad-exception-caught
+                # Offline: fall back to whatever is already cached locally.
+                self._local_path = snapshot_download(self.model, local_files_only=True)  # nosec B615
         return self._local_path
 
     def transcribe(self, audio: np.ndarray, sample_rate: int = DEFAULT_SAMPLE_RATE) -> Transcript:
