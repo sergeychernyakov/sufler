@@ -14,6 +14,7 @@ from typing import Any, Dict, Iterator, List, Optional, Type
 
 import pytest
 
+from src.config import config
 from src.llm.claude import ClaudeClient
 from src.models.enums import Mode
 
@@ -125,10 +126,10 @@ def test_system_prompt_answer_mode_wording() -> None:
 
     # Assert
     assert "ANSWER" in prompt
-    assert "2–4" in prompt
     assert "bullet points" in prompt
+    assert str(config.answer_points) in prompt
     # Should not contain the coach-specific instruction.
-    assert "3 тезиса-опоры" not in prompt
+    assert "supporting theses" not in prompt
 
 
 def test_system_prompt_coach_mode_wording() -> None:
@@ -138,8 +139,8 @@ def test_system_prompt_coach_mode_wording() -> None:
 
     # Assert
     assert "COACH" in prompt
-    assert "3 тезиса-опоры" in prompt
     assert "supporting theses" in prompt
+    assert str(config.answer_points) in prompt
     assert "НЕ давай готовый ответ" in prompt
     # Should not contain the answer-specific bullet-point instruction.
     assert "bullet points" not in prompt
@@ -318,3 +319,15 @@ def test_default_construction_builds_real_anthropic_client(monkeypatch: pytest.M
 
     # Assert
     assert captured["api_key"] == "my-secret-key"
+
+
+def test_set_model_updates_model(fake_client: _FakeAnthropic) -> None:
+    """set_model swaps the model used for subsequent requests."""
+    # Arrange
+    client = ClaudeClient(model="old", client=fake_client)
+
+    # Act
+    client.set_model("new")
+
+    # Assert
+    assert client.model == "new"

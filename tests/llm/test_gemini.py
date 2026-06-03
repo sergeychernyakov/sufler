@@ -113,6 +113,14 @@ def test_system_prompt_is_mode_specific_and_matches_claude() -> None:
     assert fake.last_messages[0].content == ClaudeClient.build_system_prompt(Mode.ANSWER)
 
 
+def test_set_model_resets_cached_client() -> None:
+    """set_model updates the model and drops the cached chat model (forces a rebuild)."""
+    client, _ = _make(["x"])
+    client.set_model("new-model")
+    assert client.model == "new-model"
+    assert client._client is None
+
+
 def test_missing_dependency_raises_runtime_error() -> None:
     """Without an injected client and no langchain_google_genai, a clear error is raised."""
     from unittest.mock import patch

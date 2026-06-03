@@ -17,8 +17,10 @@ from src.models.enums import Mode
 logger = get_logger(__name__)
 
 
-class AnswerClient(Protocol):  # pylint: disable=too-few-public-methods
+class AnswerClient(Protocol):
     """Minimal interface every answer backend implements."""
+
+    model: str
 
     def stream_answer(
         self,
@@ -29,6 +31,49 @@ class AnswerClient(Protocol):  # pylint: disable=too-few-public-methods
         mode: Mode = Mode.COACH,
     ) -> Iterator[str]:
         """Streams the answer to a question token-by-token."""
+
+    def set_model(self, model: str) -> None:
+        """Switches the model used for subsequent answers."""
+
+
+#: Curated model ids offered in the in-app selector, per provider (free tiers first).
+AVAILABLE_MODELS: dict[str, tuple[str, ...]] = {
+    "claude": ("claude-sonnet-4-6", "claude-opus-4-8", "claude-haiku-4-5"),
+    "gemini": ("gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"),
+    "groq": (
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "qwen/qwen3-32b",
+        "openai/gpt-oss-120b",
+    ),
+}
+
+
+def available_models(provider: Optional[str] = None) -> tuple[str, ...]:
+    """Returns the curated model ids for the given (or configured) provider.
+
+    Args:
+        provider (Optional[str]): Provider key; ``None`` uses ``config.llm_provider``.
+
+    Returns:
+        tuple[str, ...]: Offered model ids (empty for an unknown provider).
+    """
+    key = (provider or config.llm_provider or "claude").strip().lower()
+    return AVAILABLE_MODELS.get(key, ())
+
+
+def current_model(provider: Optional[str] = None) -> str:
+    """Returns the configured model id for the given (or configured) provider.
+
+    Args:
+        provider (Optional[str]): Provider key; ``None`` uses ``config.llm_provider``.
+
+    Returns:
+        str: The configured model id for that provider.
+    """
+    key = (provider or config.llm_provider or "claude").strip().lower()
+    return {"claude": config.model, "gemini": config.gemini_model, "groq": config.groq_model}.get(key, "")
 
 
 def create_answer_client(provider: Optional[str] = None) -> AnswerClient:

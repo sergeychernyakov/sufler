@@ -62,6 +62,15 @@ class GeminiClient:
         self._api_key: str = api_key or config.gemini_api_key
         self._client: Optional[Any] = client
 
+    def set_model(self, model: str) -> None:
+        """Switches the model; the underlying chat model is rebuilt on next use.
+
+        Args:
+            model (str): The new Gemini model id.
+        """
+        self.model = model
+        self._client = None
+
     @staticmethod
     def build_system_prompt(mode: Mode) -> str:
         """Returns the shared senior-prompter system prompt for ``mode``.

@@ -35,9 +35,15 @@ line under `[Unreleased]`**.
 - **Auto-answer recognized speech** — each finalized utterance is answered automatically (the live
   prompter flow): speak a question → it answers. Controlled by the **microphone toggle** (mic off =
   no recognition = no answers); can be disabled outright via `SUFLER_AUTO_ANSWER=false`. _feat(controller)_
-- **Drill-down on terms** — the bold `**terms**` in an answer are now clickable: tapping one asks
-  the LLM about that term and navigates into a fresh answer (unlimited depth), and a **back ("←")**
-  button returns to the previous screen. _feat(ui)_
+- **Drill-down on terms** — the bold `**terms**` in an answer are clickable: tapping one asks the
+  LLM about that term and navigates into a fresh answer (unlimited depth). Browser-style **back
+  (←)** / **forward (→)** buttons at the top of the window move through the history. _feat(ui)_
+- **In-window model selector** — a dropdown switches the answer model on the fly (the active
+  provider's free models). _feat(ui)_
+- **Resizable recognition area** — answer and transcript share a draggable splitter; drag its handle
+  (the transcript's top border) to enlarge the recognition feed. _feat(ui)_
+- **Longer answers** — up to **7** points/theses by default (was ~3); configurable via
+  `SUFLER_ANSWER_POINTS`. _feat(controller)_
 
 ### Fixed
 - **Question/answer text is selectable** (copyable) in the window — the question label was not

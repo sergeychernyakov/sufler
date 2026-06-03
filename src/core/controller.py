@@ -91,6 +91,8 @@ class Controller(QObject):
         self._speech: Optional[SpeechControl] = None
         #: Drill-down history: (question, raw answer) of screens we can go back to.
         self._nav_stack: list[tuple[str, str]] = []
+        #: Screens we returned from and can go forward to (browser-style redo).
+        self._fwd_stack: list[tuple[str, str]] = []
         self._current_question: str = ""
         self.answer_token.connect(self._overlay.append_answer)
         self.partial_speech.connect(self._on_partial_speech)
@@ -141,6 +143,18 @@ class Controller(QObject):
         self.mode = mode
         self._overlay.set_mode(mode)
 
+    def on_model_changed(self, model: str) -> None:
+        """Switches the answer model chosen in the UI selector.
+
+        Args:
+            model (str): The new model id.
+        """
+        model = model.strip()
+        if not model:
+            return
+        logger.info("Model changed -> %s", model)
+        self._claude.set_model(model)
+
     def on_term_clicked(self, term: str) -> None:
         """Drill-down: answer a clicked term, pushing the current screen onto the back stack.
 
@@ -152,28 +166,47 @@ class Controller(QObject):
             return
         logger.info("on_term_clicked: %r", term)
         self._nav_stack.append((self._current_question, self._overlay.answer_raw()))
+        self._fwd_stack.clear()
         question = f"Расскажи подробнее про: {term}"
         self._current_question = question
         self._context.set_question(question)
         self._overlay.set_question(question)
-        self._overlay.set_back_visible(True)
+        self._update_nav_buttons()
         self._start_stream(question, image_b64=None)
 
     def on_back(self) -> None:
-        """Navigate back to the previous answer (restores it without re-querying)."""
+        """Navigate back: restore the previous answer; current goes to forward history."""
         if not self._nav_stack:
             return
-        question, answer_raw = self._nav_stack.pop()
+        self._fwd_stack.append((self._current_question, self._overlay.answer_raw()))
+        self._restore(self._nav_stack.pop())
+
+    def on_forward(self) -> None:
+        """Navigate forward to a screen we returned from; current goes to back history."""
+        if not self._fwd_stack:
+            return
+        self._nav_stack.append((self._current_question, self._overlay.answer_raw()))
+        self._restore(self._fwd_stack.pop())
+
+    def _restore(self, screen: tuple[str, str]) -> None:
+        """Displays a saved (question, raw answer) screen and refreshes the nav buttons."""
+        question, answer_raw = screen
         self._current_question = question
         self._overlay.set_question(question)
         self._overlay.show_answer(answer_raw)
-        self._overlay.set_back_visible(bool(self._nav_stack))
+        self._update_nav_buttons()
 
     def _set_root(self, question: str) -> None:
-        """Begins a fresh answer thread, clearing drill-down history."""
+        """Begins a fresh answer thread, clearing back/forward history."""
         self._current_question = question
         self._nav_stack.clear()
-        self._overlay.set_back_visible(False)
+        self._fwd_stack.clear()
+        self._update_nav_buttons()
+
+    def _update_nav_buttons(self) -> None:
+        """Syncs the back/forward buttons to the navigation stacks."""
+        self._overlay.set_back_visible(bool(self._nav_stack))
+        self._overlay.set_forward_visible(bool(self._fwd_stack))
 
     def set_speech_pipeline(self, pipeline: SpeechControl) -> None:
         """Attaches the live-speech pipeline so the mic toggle can pause/resume it.

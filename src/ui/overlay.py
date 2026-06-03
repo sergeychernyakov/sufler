@@ -141,6 +141,8 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
     input_volume_changed = pyqtSignal(int)
     term_activated = pyqtSignal(str)
     back_requested = pyqtSignal()
+    forward_requested = pyqtSignal()
+    model_changed = pyqtSignal(str)
 
     def __init__(self, parent: QtWidgets.QWidget | None = None, *, stealth: bool = False) -> None:
         """Builds the overlay window and lays out widgets.
@@ -306,9 +308,21 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
 
         self._back_button = QtWidgets.QPushButton("←", self)
         self._back_button.setObjectName("backButton")
-        self._back_button.setToolTip("Назад к предыдущему ответу")
+        self._back_button.setToolTip("Назад")
         self._back_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self._back_button.hide()
+
+        self._forward_button = QtWidgets.QPushButton("→", self)
+        self._forward_button.setObjectName("forwardButton")
+        self._forward_button.setToolTip("Вперёд")
+        self._forward_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._forward_button.hide()
+
+        self._model_label = QtWidgets.QLabel("Модель", self)
+        self._model_label.setObjectName("controlLabel")
+        self._model_combo = QtWidgets.QComboBox(self)
+        self._model_combo.setObjectName("modelCombo")
+        self._model_combo.setCursor(Qt.CursorShape.PointingHandCursor)
 
         self._capture_button = QtWidgets.QPushButton(self)
         self._capture_button.setObjectName("captureButton")
@@ -340,7 +354,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._transcript.setObjectName("transcript")
         self._transcript.setReadOnly(True)
         self._transcript.setPlaceholderText("Распознанная речь появится здесь…")
-        self._transcript.setMaximumHeight(120)
+        self._transcript.setMinimumHeight(48)
 
         self._transcript_toggle = QtWidgets.QCheckBox("Показывать распознавание", self)
         self._transcript_toggle.setObjectName("transcriptToggle")
@@ -367,18 +381,37 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(6)
-        layout.addWidget(self._question_label)
-        layout.addWidget(self._answer_label, stretch=1)
-        layout.addWidget(self._transcript, stretch=1)
+        # Top navigation: ← back, the question (header), → forward.
+        nav_row = QtWidgets.QHBoxLayout()
+        nav_row.setSpacing(6)
+        nav_row.addWidget(self._back_button)
+        nav_row.addWidget(self._question_label, stretch=1)
+        nav_row.addWidget(self._forward_button)
+        layout.addLayout(nav_row)
+
+        # Answer + transcript share a draggable vertical splitter — drag the handle
+        # (the recognition area's top border) to resize it.
+        self._body_splitter = QtWidgets.QSplitter(Qt.Orientation.Vertical, self)
+        self._body_splitter.addWidget(self._answer_label)
+        self._body_splitter.addWidget(self._transcript)
+        self._body_splitter.setStretchFactor(0, 3)
+        self._body_splitter.setStretchFactor(1, 1)
+        self._body_splitter.setSizes([260, 120])
+        layout.addWidget(self._body_splitter, stretch=1)
 
         controls = QtWidgets.QHBoxLayout()
         controls.setSpacing(6)
-        controls.addWidget(self._back_button)
         controls.addWidget(self._capture_button)
         controls.addWidget(self._mic_button)
         controls.addWidget(self._input_field, stretch=1)
         controls.addWidget(self._send_button)
         layout.addLayout(controls)
+
+        model_row = QtWidgets.QHBoxLayout()
+        model_row.setSpacing(6)
+        model_row.addWidget(self._model_label)
+        model_row.addWidget(self._model_combo, stretch=1)
+        layout.addLayout(model_row)
 
         volume_row = QtWidgets.QHBoxLayout()
         volume_row.setSpacing(6)
@@ -397,6 +430,8 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
     def _connect_signals(self) -> None:
         """Wires child-widget signals to the overlay's public signals."""
         self._back_button.clicked.connect(self.back_requested)
+        self._forward_button.clicked.connect(self.forward_requested)
+        self._model_combo.textActivated.connect(self.model_changed)
         self._answer_label.linkActivated.connect(self._on_answer_link)
         self._capture_button.clicked.connect(self._on_capture_clicked)
         self._mic_button.clicked.connect(self._on_mic_clicked)
@@ -483,16 +518,25 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
                 color: #f2f2f2;
                 font-size: 13px;
             }
-            QPushButton#captureButton, QPushButton#sendButton, QPushButton#micButton, QPushButton#backButton {
+            QPushButton#captureButton, QPushButton#sendButton, QPushButton#micButton,
+            QPushButton#backButton, QPushButton#forwardButton {
                 background-color: rgba(60, 60, 70, 230);
                 border: 1px solid rgba(120, 120, 140, 200);
                 border-radius: 6px;
                 padding: 4px 10px;
                 font-size: 15px;
             }
-            QPushButton#captureButton:hover, QPushButton#sendButton:hover,
-            QPushButton#micButton:hover, QPushButton#backButton:hover {
+            QPushButton#captureButton:hover, QPushButton#sendButton:hover, QPushButton#micButton:hover,
+            QPushButton#backButton:hover, QPushButton#forwardButton:hover {
                 background-color: rgba(80, 80, 92, 240);
+            }
+            QComboBox#modelCombo {
+                background-color: rgba(40, 40, 48, 230);
+                border: 1px solid rgba(110, 110, 130, 200);
+                border-radius: 6px;
+                padding: 2px 6px;
+                color: #f2f2f2;
+                font-size: 11px;
             }
             QPushButton#micButton:checked {
                 background-color: rgba(36, 78, 44, 235);
@@ -678,6 +722,38 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
             visible (bool): ``True`` to show the back button.
         """
         self._back_button.setVisible(visible)
+
+    def set_forward_visible(self, visible: bool) -> None:
+        """Shows or hides the navigation forward ("→") button.
+
+        Args:
+            visible (bool): ``True`` to show the forward button.
+        """
+        self._forward_button.setVisible(visible)
+
+    def set_models(self, models: list[str], current: str) -> None:
+        """Populates the model selector and selects ``current`` (no signal emitted).
+
+        Args:
+            models (list[str]): The model ids to offer.
+            current (str): The model id to pre-select (added if not in ``models``).
+        """
+        self._model_combo.blockSignals(True)
+        self._model_combo.clear()
+        self._model_combo.addItems(models)
+        if current and current not in models:
+            self._model_combo.addItem(current)
+        if current:
+            self._model_combo.setCurrentText(current)
+        self._model_combo.blockSignals(False)
+
+    def selected_model(self) -> str:
+        """Returns the currently selected model id.
+
+        Returns:
+            str: The model id shown in the selector.
+        """
+        return self._model_combo.currentText()
 
     def _render_answer(self, raw: str) -> None:
         """Stores ``raw`` and renders it as rich text with clickable ``**term**`` links."""

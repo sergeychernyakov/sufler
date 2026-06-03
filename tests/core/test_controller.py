@@ -19,6 +19,7 @@ class _FakeOverlay:
         self.levels: list[float] = []
         self.shown_answers: list[str] = []
         self.back_visible = False
+        self.forward_visible = False
         self.begun = 0
         self.ended = 0
         self.hidden = 0
@@ -47,6 +48,9 @@ class _FakeOverlay:
     def set_back_visible(self, visible: bool) -> None:
         self.back_visible = visible
 
+    def set_forward_visible(self, visible: bool) -> None:
+        self.forward_visible = visible
+
     def answer_raw(self) -> str:
         return "".join(self.answer_tokens)
 
@@ -72,10 +76,14 @@ class _FakeClaude:
     def __init__(self, tokens) -> None:
         self.tokens = tokens
         self.calls: list[dict] = []
+        self.model = "fake-model"
 
     def stream_answer(self, question, *, image_b64=None, context=None, mode=Mode.COACH):
         self.calls.append({"question": question, "image_b64": image_b64, "context": context, "mode": mode})
         return iter(self.tokens)
+
+    def set_model(self, model) -> None:
+        self.model = model
 
 
 def _make(tokens=("a", "b"), grab=lambda: "IMG"):
@@ -275,3 +283,21 @@ def test_new_question_clears_drill_history() -> None:
     assert overlay.back_visible is False
     controller.on_back()  # nothing to restore
     assert overlay.shown_answers == []
+
+
+def test_on_model_changed_switches_client_model() -> None:
+    controller, _, claude, _ = _make()
+    controller.on_model_changed("llama-3.3-70b-versatile")
+    assert claude.model == "llama-3.3-70b-versatile"
+
+
+def test_back_then_forward_toggles_nav_buttons() -> None:
+    controller, overlay, _, _ = _make()
+    controller.on_submit_text("Q")
+    controller.on_term_clicked("term")  # drill -> back available
+    controller.on_back()
+    assert overlay.forward_visible is True  # we can now go forward
+    assert overlay.back_visible is False
+    controller.on_forward()
+    assert overlay.back_visible is True  # back available again
+    assert overlay.forward_visible is False
