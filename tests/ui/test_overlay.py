@@ -642,6 +642,16 @@ def test_copy_button_copies_question_and_answer(overlay: Overlay) -> None:
     assert "**" not in clip
 
 
+def test_copy_button_shows_feedback_then_reverts(overlay: Overlay) -> None:
+    """Copying flips the button to ✓ briefly, then it reverts to 📋."""
+    overlay.set_question("Q")
+    overlay.show_answer("ответ")
+    overlay._copy_button.click()
+    assert overlay._copy_button.text() == "✓"
+    overlay._reset_copy_button()
+    assert overlay._copy_button.text() == "📋"
+
+
 def test_answer_lives_in_a_scroll_area(overlay: Overlay) -> None:
     """The answer label is wrapped in a resizable scroll area (long answers scroll)."""
     assert overlay._answer_scroll.widget() is overlay._answer_label

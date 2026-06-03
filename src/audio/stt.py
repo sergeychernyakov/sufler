@@ -46,11 +46,6 @@ DEFAULT_MLX_MODEL: str = "mlx-community/whisper-large-v3-turbo"
 #: Target sample rate (Hz) Whisper models expect for their input audio.
 DEFAULT_SAMPLE_RATE: int = 16000
 
-#: Minimum RMS amplitude to treat a clip as speech. RMS (unlike peak) ignores brief
-#: clicks/spikes, so quiet noise is reliably skipped — normalizing it makes Whisper
-#: hallucinate repeated phrases.
-MIN_SPEECH_RMS: float = 0.008
-
 
 def _is_degenerate(text: str) -> bool:
     """Detects repetitive/hallucinated transcripts (Whisper degenerates on non-speech).
@@ -237,9 +232,9 @@ class MlxWhisperEngine(STTEngine):
         peak = float(np.max(np.abs(audio))) if audio.size else 0.0
         rms = float(np.sqrt(np.mean(np.square(audio, dtype=np.float64)))) if audio.size else 0.0
         logger.info("Utterance level: rms=%.4f peak=%.4f samples=%d", rms, peak, audio.size)
-        if rms < MIN_SPEECH_RMS:
+        if rms < config.min_speech_rms:
             # Too quiet to be speech: skip. Normalizing near-silent noise makes Whisper hallucinate.
-            logger.debug("Skipping clip below speech RMS (rms=%.4f)", rms)
+            logger.debug("Skipping clip below speech RMS (rms=%.4f < %.4f)", rms, config.min_speech_rms)
             return Transcript(text="", language=None)
         audio = (audio / peak * 0.95).astype(np.float32) if peak > 1e-4 else audio
 

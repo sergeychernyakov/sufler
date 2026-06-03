@@ -53,6 +53,9 @@ class Config:
     stt_engine: str = field(default_factory=lambda: os.getenv("SUFLER_STT_ENGINE", "mlx"))
     stt_model: str = field(default_factory=lambda: os.getenv("SUFLER_STT_MODEL", ""))
     stt_language: str = field(default_factory=lambda: os.getenv("SUFLER_STT_LANGUAGE", ""))
+    # Minimum RMS to treat a captured clip as speech (lower = more sensitive, but more
+    # silence hallucinations). Lower it for a weak microphone.
+    min_speech_rms: float = field(default_factory=lambda: float(os.getenv("SUFLER_MIN_SPEECH_RMS", "0.004") or "0.004"))
     loopback_device: str = field(default_factory=lambda: os.getenv("SUFLER_LOOPBACK_DEVICE", ""))
 
     # UI

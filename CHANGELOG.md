@@ -45,14 +45,17 @@ line under `[Unreleased]`**.
   provider's free models). _feat(ui)_
 - **Output-language selector** — a dropdown (right of the model selector) sets the answer language
   (`ru` / `en`, default `ru`), wired into the system prompt via `SUFLER_ANSWER_LANG`. _feat(ui)_
-- **Copy button** (📋) — copies the current question + answer (markdown markers stripped) to the
-  clipboard. _feat(ui)_
+- **Copy button** (📋, in the button row right of Enter) — copies the current question + answer
+  (markdown markers stripped) to the clipboard, with a brief ✓ confirmation. _feat(ui)_
 - **Resizable recognition area** — answer and transcript share a draggable splitter; drag its handle
   (the transcript's top border) to enlarge the recognition feed. _feat(ui)_
 - **Longer answers** — up to **7** points/theses by default (was ~3); configurable via
   `SUFLER_ANSWER_POINTS`. _feat(controller)_
 
 ### Fixed
+- **Weak-microphone recognition** — the speech-detection RMS gate is now configurable
+  (`SUFLER_MIN_SPEECH_RMS`, default lowered `0.008` → `0.004`), so quiet mic input is no longer
+  silently skipped. _fix(audio)_
 - **Scrollable answer area** — long answers were clipped; the answer now scrolls inside its pane. _fix(ui)_
 - **Hide model reasoning** — `<think>…</think>` blocks (emitted by some models) are stripped from
   the answer. _fix(ui)_
