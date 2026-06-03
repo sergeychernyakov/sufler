@@ -612,3 +612,23 @@ def test_set_models_does_not_emit(overlay: Overlay, qtbot) -> None:
     with qtbot.assertNotEmitted(overlay.model_changed):
         overlay.set_models(["a", "b"], "b")
     assert overlay.selected_model() == "b"
+
+
+def test_language_selector_reflects_and_emits(overlay: Overlay, qtbot) -> None:
+    """set_language updates the selector; a user pick emits ``language_changed``."""
+    overlay.set_language("ru")
+    assert overlay.selected_language() == "ru"
+    with qtbot.waitSignal(overlay.language_changed, timeout=1000) as blocker:
+        overlay._lang_combo.textActivated.emit("en")
+    assert blocker.args == ["en"]
+
+
+def test_copy_button_copies_question_and_answer(overlay: Overlay) -> None:
+    """The copy button puts the question + answer (without ** markers) on the clipboard."""
+    overlay.set_question("Вопрос?")
+    overlay.show_answer("**Термин**: текст")
+    overlay._copy_button.click()
+    clip = QApplication.clipboard().text()
+    assert "Вопрос?" in clip
+    assert "Термин" in clip
+    assert "**" not in clip

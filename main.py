@@ -74,7 +74,9 @@ def build_app(*, claude: Optional[AnswerClient] = None) -> tuple[Overlay, Contro
     overlay.back_requested.connect(controller.on_back)
     overlay.forward_requested.connect(controller.on_forward)
     overlay.model_changed.connect(controller.on_model_changed)
+    overlay.language_changed.connect(controller.on_language_changed)
     overlay.set_models(list(available_models()), current_model())
+    overlay.set_language(config.answer_lang)
 
     hotkeys = HotkeyManager(
         capture_hotkey=config.hotkey_capture,

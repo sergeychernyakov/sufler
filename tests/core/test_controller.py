@@ -4,6 +4,7 @@
 
 import pytest
 
+from src.config import config
 from src.core.context import RollingContext
 from src.core.controller import CAPTURE_PROMPT, Controller
 from src.models.enums import Mode
@@ -289,6 +290,13 @@ def test_on_model_changed_switches_client_model() -> None:
     controller, _, claude, _ = _make()
     controller.on_model_changed("llama-3.3-70b-versatile")
     assert claude.model == "llama-3.3-70b-versatile"
+
+
+def test_on_language_changed_sets_answer_lang(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(config, "answer_lang", "ru")  # baseline, auto-restored after the test
+    controller, _, _, _ = _make()
+    controller.on_language_changed("en")
+    assert config.answer_lang == "en"
 
 
 def test_back_then_forward_toggles_nav_buttons() -> None:

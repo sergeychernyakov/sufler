@@ -31,9 +31,15 @@ logger = get_logger(__name__)
 # modest cap keeps latency low and stops the model rambling past the format.
 _MAX_TOKENS: int = 1024
 
+#: Output-language clause, keyed by ``SUFLER_ANSWER_LANG``.
+_LANGUAGE_CLAUSE: Dict[str, str] = {
+    "ru": "русском языке (Russian)",
+    "en": "English",
+}
+
 _BASE_SYSTEM_PROMPT: str = (
     "Ты — опытный senior-level суфлёр на техническом собеседовании. "
-    "Отвечай на русском языке (Russian), но все технические термины оставляй на "
+    "Отвечай на {lang}, но все технические термины оставляй на "
     "English (например: thread, deadlock, index, garbage collector). "
     "Будь точным и по существу, без воды и вводных фраз."
 )
@@ -109,8 +115,10 @@ class ClaudeClient:
             str: The base senior-prompter persona combined with mode-specific
             formatting instructions.
         """
+        lang = (config.answer_lang or "ru").strip().lower()
+        base = _BASE_SYSTEM_PROMPT.format(lang=_LANGUAGE_CLAUSE.get(lang, _LANGUAGE_CLAUSE["ru"]))
         instructions = _MODE_INSTRUCTIONS[mode].format(points=config.answer_points)
-        return f"{_BASE_SYSTEM_PROMPT}\n\n{instructions}"
+        return f"{base}\n\n{instructions}"
 
     @staticmethod
     def _build_content(

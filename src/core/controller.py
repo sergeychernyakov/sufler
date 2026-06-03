@@ -19,6 +19,7 @@ from PyQt6 import QtWidgets
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from src.audio.system_volume import set_input_volume as default_set_input_volume
+from src.config import config
 from src.core.context import RollingContext
 from src.helpers.logger import get_logger
 from src.llm.factory import AnswerClient
@@ -154,6 +155,18 @@ class Controller(QObject):
             return
         logger.info("Model changed -> %s", model)
         self._claude.set_model(model)
+
+    def on_language_changed(self, language: str) -> None:
+        """Sets the output language the model should answer in (e.g. ``ru`` / ``en``).
+
+        Args:
+            language (str): The answer language code.
+        """
+        language = language.strip().lower()
+        if not language:
+            return
+        logger.info("Answer language -> %s", language)
+        config.answer_lang = language
 
     def on_term_clicked(self, term: str) -> None:
         """Drill-down: answer a clicked term, pushing the current screen onto the back stack.
