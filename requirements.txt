@@ -19,6 +19,7 @@ pynput>=1.7
 # LLM — answer backends (selected via SUFLER_LLM_PROVIDER)
 anthropic>=0.40                  # provider "claude" (Anthropic, paid)
 langchain-google-genai>=2.0      # provider "gemini" (Google, free tier; vision + streaming)
+langchain-groq>=0.2              # provider "groq" (free tier; Llama 4 Scout = vision + streaming)
 
 # Config / models
 python-dotenv>=1.0

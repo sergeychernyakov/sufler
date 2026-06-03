@@ -8,6 +8,7 @@ from src.llm import factory
 from src.llm.claude import ClaudeClient
 from src.llm.factory import create_answer_client
 from src.llm.gemini import GeminiClient
+from src.llm.groq import GroqClient
 
 
 def test_create_claude_client_for_provider(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -26,6 +27,15 @@ def test_create_gemini_client_for_provider(monkeypatch: pytest.MonkeyPatch) -> N
 
     # Act / Assert
     assert isinstance(create_answer_client(), GeminiClient)
+
+
+def test_create_groq_client_for_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``llm_provider == 'groq'`` builds a ``GroqClient`` (no network/model yet)."""
+    # Arrange
+    monkeypatch.setattr(factory.config, "llm_provider", "groq")
+
+    # Act / Assert
+    assert isinstance(create_answer_client(), GroqClient)
 
 
 def test_explicit_provider_overrides_config(monkeypatch: pytest.MonkeyPatch) -> None:
