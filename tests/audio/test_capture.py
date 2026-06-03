@@ -418,6 +418,61 @@ def test_start_opens_mocked_input_stream(callbacks: tuple[_Recorder, _Recorder])
     assert capture._stream is stream
 
 
+def test_start_defaults_device_to_none(callbacks: tuple[_Recorder, _Recorder]) -> None:
+    """Without a device, start() opens the stream on the default input (None)."""
+    # Arrange
+    on_partial, on_final = callbacks
+    capture = _make_capture(on_partial, on_final)
+    fake_sd = MagicMock()
+
+    # Act
+    with patch.dict(sys.modules, {"sounddevice": fake_sd}):
+        capture.start()
+
+    # Assert
+    assert fake_sd.InputStream.call_args.kwargs["device"] is None
+
+
+def test_start_forwards_device_to_input_stream(callbacks: tuple[_Recorder, _Recorder]) -> None:
+    """A configured device is passed through to sounddevice.InputStream."""
+    # Arrange
+    on_partial, on_final = callbacks
+    capture = MicrophoneCapture(
+        on_partial=on_partial,
+        on_final=on_final,
+        sample_rate=SAMPLE_RATE,
+        device="BlackHole 2ch",
+    )
+    fake_sd = MagicMock()
+
+    # Act
+    with patch.dict(sys.modules, {"sounddevice": fake_sd}):
+        capture.start()
+
+    # Assert
+    assert fake_sd.InputStream.call_args.kwargs["device"] == "BlackHole 2ch"
+
+
+def test_start_forwards_integer_device_index(callbacks: tuple[_Recorder, _Recorder]) -> None:
+    """An integer device index is forwarded verbatim to InputStream."""
+    # Arrange
+    on_partial, on_final = callbacks
+    capture = MicrophoneCapture(
+        on_partial=on_partial,
+        on_final=on_final,
+        sample_rate=SAMPLE_RATE,
+        device=2,
+    )
+    fake_sd = MagicMock()
+
+    # Act
+    with patch.dict(sys.modules, {"sounddevice": fake_sd}):
+        capture.start()
+
+    # Assert
+    assert fake_sd.InputStream.call_args.kwargs["device"] == 2
+
+
 def test_stop_stops_and_closes_the_stream(callbacks: tuple[_Recorder, _Recorder]) -> None:
     """stop() stops, closes and clears a running stream."""
     # Arrange

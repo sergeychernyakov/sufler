@@ -32,7 +32,7 @@ Testability:
 
 from __future__ import annotations
 
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Union
 
 import numpy as np
 
@@ -52,7 +52,7 @@ class MicrophoneCapture:  # pylint: disable=too-many-instance-attributes
     resets.
     """
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         *,
         on_partial: Callable[[np.ndarray], None],
@@ -61,6 +61,7 @@ class MicrophoneCapture:  # pylint: disable=too-many-instance-attributes
         partial_seconds: float = 1.2,
         silence_seconds: float = 0.7,
         silence_rms: float = 0.01,
+        device: Optional[Union[int, str]] = None,
     ) -> None:
         """Configures the capturer and its segmentation thresholds.
 
@@ -78,6 +79,11 @@ class MicrophoneCapture:  # pylint: disable=too-many-instance-attributes
                 utterance, in seconds. Defaults to ``0.7``.
             silence_rms (float): RMS amplitude at or below which an audio block
                 is treated as silence. Defaults to ``0.01``.
+            device (Optional[Union[int, str]]): The sounddevice input device to
+                capture from — an index or name passed straight to
+                ``sounddevice.InputStream(device=...)``. ``None`` (the default)
+                uses the system default input. Resolve names/indices up front
+                with :func:`src.audio.devices.resolve_input_device`.
         """
         self._on_partial = on_partial
         self._on_final = on_final
@@ -85,6 +91,9 @@ class MicrophoneCapture:  # pylint: disable=too-many-instance-attributes
         self.partial_seconds = partial_seconds
         self.silence_seconds = silence_seconds
         self.silence_rms = silence_rms
+
+        #: Input device passed to ``sounddevice.InputStream``; ``None`` = default.
+        self._device = device
 
         #: Samples that constitute one ``partial_seconds`` window.
         self._partial_samples = max(1, int(round(partial_seconds * sample_rate)))
@@ -108,8 +117,9 @@ class MicrophoneCapture:  # pylint: disable=too-many-instance-attributes
 
         ``sounddevice`` is imported lazily here so merely importing this module
         (for example, in tests) never touches the audio backend. The stream is
-        opened as mono float32 at :attr:`sample_rate`; its callback forwards
-        each captured block to :meth:`_ingest`.
+        opened as mono float32 at :attr:`sample_rate` on the configured input
+        device (the system default when unset); its callback forwards each
+        captured block to :meth:`_ingest`.
         """
         import sounddevice as sd  # pylint: disable=import-outside-toplevel
 
@@ -117,11 +127,16 @@ class MicrophoneCapture:  # pylint: disable=too-many-instance-attributes
             samplerate=self.sample_rate,
             channels=1,
             dtype="float32",
+            device=self._device,
             callback=self._stream_callback,
         )
         stream.start()
         self._stream = stream
-        logger.info("Microphone capture started (%d Hz, mono float32)", self.sample_rate)
+        logger.info(
+            "Microphone capture started (%d Hz, mono float32, device=%s)",
+            self.sample_rate,
+            self._device if self._device is not None else "default",
+        )
 
     def stop(self) -> None:
         """Stops and closes the input stream if one is running.
