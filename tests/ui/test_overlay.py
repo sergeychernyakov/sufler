@@ -429,3 +429,25 @@ def test_level_meter_paints_without_error(qtbot) -> None:
     # Act / Assert: grab() forces a paintEvent over green/amber/red bars.
     meter.set_level(0.9)
     meter.grab()
+    meter.setEnabled(False)  # also exercises the dimmed-when-disabled paint path
+    meter.grab()
+
+
+def test_muting_dims_input_controls_and_zeroes_level(overlay: Overlay) -> None:
+    """Muting the mic disables (greys) the input controls and zeroes the meter."""
+    # Arrange: listening, with a non-zero level on the meter.
+    overlay.set_listening(True)
+    overlay.set_input_level(0.8)
+
+    # Act
+    overlay.set_listening(False)
+
+    # Assert: controls dimmed and the level reset.
+    assert overlay._volume_slider.isEnabled() is False
+    assert overlay._level_meter.isEnabled() is False
+    assert overlay._level_meter._level == 0.0
+
+    # Act: unmuting re-activates the controls.
+    overlay.set_listening(True)
+    assert overlay._volume_slider.isEnabled() is True
+    assert overlay._level_meter.isEnabled() is True
