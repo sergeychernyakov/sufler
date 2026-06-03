@@ -33,8 +33,8 @@ line under `[Unreleased]`**.
 - **"Thinking" spinner** — an animated indicator in the answer area while the LLM generates,
   replaced by the first streamed token (and showing "(пустой ответ)" if nothing comes back). _feat(ui)_
 - **Auto-answer recognized speech** — each finalized utterance is answered automatically (the live
-  prompter flow): speak a question → it answers. Toggle in the window ("Авто-ответ") or via
-  `SUFLER_AUTO_ANSWER`. _feat(controller)_
+  prompter flow): speak a question → it answers. Controlled by the **microphone toggle** (mic off =
+  no recognition = no answers); can be disabled outright via `SUFLER_AUTO_ANSWER=false`. _feat(controller)_
 
 ### Fixed
 - **Question/answer text is selectable** (copyable) in the window — the question label was not

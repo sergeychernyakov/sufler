@@ -540,26 +540,8 @@ def test_font_scale_is_clamped(overlay: Overlay) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Auto-answer toggle + selectable text
+# Selectable (copyable) text
 # --------------------------------------------------------------------------- #
-def test_auto_answer_is_on_by_default_and_emits(overlay: Overlay, qtbot) -> None:
-    """The auto-answer checkbox starts on and emits ``auto_answer_toggled`` on change."""
-    # Assert default
-    assert overlay.is_auto_answer_enabled() is True
-
-    # Act / Assert: unticking emits the toggle
-    with qtbot.waitSignal(overlay.auto_answer_toggled, timeout=1000) as blocker:
-        overlay._auto_answer_toggle.setChecked(False)
-    assert blocker.args == [False]
-
-
-def test_set_auto_answer_enabled_does_not_emit(overlay: Overlay, qtbot) -> None:
-    """``set_auto_answer_enabled`` syncs the checkbox without emitting the signal."""
-    with qtbot.assertNotEmitted(overlay.auto_answer_toggled):
-        overlay.set_auto_answer_enabled(False)
-    assert overlay.is_auto_answer_enabled() is False
-
-
 def test_question_and_answer_text_are_selectable(overlay: Overlay) -> None:
     """The question and answer areas allow mouse text selection (so they can be copied)."""
     flag = Qt.TextInteractionFlag.TextSelectableByMouse

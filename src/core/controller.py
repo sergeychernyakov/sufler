@@ -135,15 +135,6 @@ class Controller(QObject):
         self.mode = mode
         self._overlay.set_mode(mode)
 
-    def set_auto_answer(self, enabled: bool) -> None:
-        """Enables/disables auto-answering each finalized recognized utterance.
-
-        Args:
-            enabled (bool): ``True`` to answer recognized speech automatically.
-        """
-        self.auto_answer = enabled
-        logger.info("Auto-answer %s", "on" if enabled else "off")
-
     def set_speech_pipeline(self, pipeline: SpeechControl) -> None:
         """Attaches the live-speech pipeline so the mic toggle can pause/resume it.
 

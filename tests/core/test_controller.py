@@ -231,11 +231,3 @@ def test_final_speech_does_not_answer_when_auto_off() -> None:
     controller = Controller(overlay, claude, RollingContext(), runner=lambda w: w(), auto_answer=False)
     controller.final_speech.emit("что такое REST?")
     assert claude.calls == []
-
-
-def test_set_auto_answer_toggles_flag() -> None:
-    controller, _, _, _ = _make()
-    controller.set_auto_answer(False)
-    assert controller.auto_answer is False
-    controller.set_auto_answer(True)
-    assert controller.auto_answer is True
