@@ -9,6 +9,14 @@ line under `[Unreleased]`**.
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.1.0] - 2026-06-03
+
+First MVP: stealth overlay + screenshot → Claude (streaming) + global hotkeys + manual
+input + live STT (MLX Whisper) + loopback capture + rolling context, on a strict,
+automated quality toolchain.
+
 ### Added
 - **Quality toolchain & strict git workflow** — pre-commit hooks (format / lint / type /
   security / secret-scan / tests), `bin/setup`, `bin/ci`, `bin/check_coverage`,
@@ -61,6 +69,5 @@ line under `[Unreleased]`**.
 
 ---
 
-> No releases yet. When the MVP ships, move the relevant entries under a version heading
-> (e.g. `## [0.1.0] - YYYY-MM-DD`) and start a fresh `[Unreleased]`.
-> Deferred: **Phase 7 — loopback audio (BlackHole)**.
+> Beyond v1 (deferred): Deepgram streaming STT, auto-trigger on question detection,
+> and ScreenCaptureKit / CoreAudio Taps loopback instead of BlackHole.
