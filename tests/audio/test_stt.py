@@ -423,3 +423,15 @@ def test_mlx_transcribe_discards_english_silence_filler(fake_mlx: _FakeMlxWhispe
 
     # Act / Assert
     assert engine.transcribe(_fake_audio()).text == ""
+
+
+def test_quiet_clip_below_rms_gate_is_skipped(fake_mlx: _FakeMlxWhisper, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A clip with RMS below ``config.min_speech_rms`` is skipped before the model runs."""
+    # Arrange: a near-silent clip and a high gate.
+    monkeypatch.setattr(stt.config, "min_speech_rms", 0.1)
+    engine = MlxWhisperEngine()
+    quiet = np.full(16, 0.001, dtype=np.float32)  # rms 0.001 < 0.1
+
+    # Act / Assert: empty result, and the model was never called.
+    assert engine.transcribe(quiet).text == ""
+    assert fake_mlx.calls == []

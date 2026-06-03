@@ -175,6 +175,11 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._thinking_timer = QtCore.QTimer(self)
         self._thinking_timer.timeout.connect(self._on_thinking_tick)
 
+        # Brief "copied ✓" feedback on the copy button.
+        self._copy_revert_timer = QtCore.QTimer(self)
+        self._copy_revert_timer.setSingleShot(True)
+        self._copy_revert_timer.timeout.connect(self._reset_copy_button)
+
         self._build_window()
         self._build_widgets()
         self._build_layout()
@@ -811,7 +816,15 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         clipboard = QtWidgets.QApplication.clipboard()
         if clipboard is not None:
             clipboard.setText("\n\n".join(parts))
+        self._copy_button.setText("✓")
+        self._copy_button.setToolTip("Скопировано")
+        self._copy_revert_timer.start(1200)
         logger.debug("Copied question + answer to clipboard")
+
+    def _reset_copy_button(self) -> None:
+        """Restores the copy button after the brief 'copied' feedback."""
+        self._copy_button.setText("📋")
+        self._copy_button.setToolTip("Скопировать вопрос и ответ")
 
     def _render_answer(self, raw: str) -> None:
         """Stores ``raw`` (with any <think> reasoning removed) and renders it with links."""
