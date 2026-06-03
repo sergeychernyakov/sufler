@@ -45,6 +45,7 @@ See **[`README.md`](./README.md)** for an overview of the project’s purpose, r
 - `main` is **protected**: direct commits and pushes are blocked. Use feature branches + PRs.
 - Branch names: `<type>/<short-description>` (e.g. `feat/overlay-stealth`).
 - Commit messages follow **Conventional Commits**: `<type>(<scope>): <subject>` (subject ≤ 72 chars).
+- **Every change adds an entry under `[Unreleased]` in [`CHANGELOG.md`](./CHANGELOG.md)** (Keep a Changelog).
 - Full rules and examples: **[`docs/COMMIT_CONVENTION.md`](./docs/COMMIT_CONVENTION.md)**.
 
 ---
@@ -64,4 +65,5 @@ See **[`README.md`](./README.md)** for an overview of the project’s purpose, r
 - [ ] Linting/formatting/types pass (`black`, `isort`, `ruff`, `pylint ≥ 9.5`, `mypy`).
 - [ ] No hard-coded secrets; environment variables used where necessary.
 - [ ] Commit messages follow Conventional Commits (see `docs/COMMIT_CONVENTION.md`).
+- [ ] `CHANGELOG.md` `[Unreleased]` updated with the change.
 - [ ] Any setup or run instructions updated in `README.md` if required.

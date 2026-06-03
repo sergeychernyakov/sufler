@@ -158,4 +158,5 @@ pre-commit, ruff/black/isort/pylint/mypy/bandit/pip-audit, `bin/ci`, `bin/check_
 - [ ] Тесты добавлены; целевое покрытие пакета достигнуто.
 - [ ] Нет хардкода секретов; новые настройки — в `.env.example`.
 - [ ] README/доки и `.env.example` отражают изменения.
+- [ ] `CHANGELOG.md` `[Unreleased]` обновлён.
 - [ ] Коммиты по Conventional Commits; PR из фича-ветки в `main`.
