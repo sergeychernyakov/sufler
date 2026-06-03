@@ -160,12 +160,17 @@ To run the main application:
 python main.py
 ```
 
-Today `main.py` is the skeleton entry point — the overlay app is built
-incrementally (see [`docs/DEVELOPMENT_PLAN.md`](./docs/DEVELOPMENT_PLAN.md)). It will:
-1. Initialize the logging system with rotation
-2. Run the main application logic
-3. Handle graceful shutdown on interruption (Ctrl+C)
-4. Log all activities to both console and file (`tmp/logs/`)
+`python main.py` launches the stealth overlay. Phases 1–4 and 6 are built; STT and
+loopback are planned (see [`docs/DEVELOPMENT_PLAN.md`](./docs/DEVELOPMENT_PLAN.md)).
+Requires `ANTHROPIC_API_KEY` in `.env` and macOS **Screen Recording** + **Accessibility**
+permissions (see above). It will:
+1. Show a translucent, always-on-top overlay with a question field, a streamed answer
+   area, a "📸 Скрин" button and a manual input field
+2. On capture (button or hotkey): hide the overlay, screenshot the screen, and stream
+   Claude's answer back into the overlay (`coach` / `answer` modes)
+3. Honor stealth controls (opacity, click-through, compact, panic-hide) and global hotkeys
+
+> Logs go to `tmp/logs/`. Without an API key the overlay still launches, but captures error.
 
 ### Using the Logger
 
@@ -215,11 +220,11 @@ logger.error("An error occurred", exc_info=True)
 │   ├── config/           # settings (env-based: API key, model, mode, hotkeys)
 │   ├── helpers/          # logger (rotation)
 │   ├── models/           # Pydantic base + enums
-│   ├── ui/               # overlay (PyQt6, stealth)          — planned, Phase 1
-│   ├── vision/           # screenshot (screencapture/mss)    — planned, Phase 2
-│   ├── llm/              # claude.py (multimodal + stream)   — planned, Phase 2
-│   ├── audio/            # capture + stt (whisper.cpp/MLX)   — planned, Phase 5
-│   └── core/             # controller + rolling context      — planned, Phase 3/6
+│   ├── ui/               # overlay.py (PyQt6, stealth) ✅
+│   ├── vision/           # screenshot.py (screencapture/mss) ✅
+│   ├── llm/              # claude.py (multimodal + streaming) ✅
+│   ├── audio/            # capture + stt (whisper.cpp/MLX)  — planned, Phase 5
+│   └── core/             # context.py + controller.py + hotkeys.py ✅
 ├── tests/                # Unit tests
 │   └── __init__.py
 ├── artifacts/            # Agent outputs (created during workflows)

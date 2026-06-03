@@ -3,6 +3,12 @@
 Документ переводит **[`SUFLER_SPEC.md`](../SUFLER_SPEC.md)** в конкретные фазы, модули,
 критерии приёмки и тесты. Спека — это «что» и «зачем»; этот план — «как» и «в каком порядке».
 
+## Статус (2026-06-03)
+- ✅ **Фазы 1–4, 6** реализованы: overlay, screenshot, Claude-клиент, ручной ввод,
+  rolling context — плюс контроллер `on_capture` и `main.py`. `python main.py` запускает оверлей.
+- Покрытие ~98 %, `bin/ci` зелёный. Ветка `feat/app-mvp`.
+- ⏳ Осталось: **Фаза 5 (STT)** и **Фаза 7 (loopback)** — нужен реальный движок и живой звук.
+
 ## Принципы
 
 - **MVP сначала, аудио-ад потом.** Порядок намеренно переставлен (см. спеку): сначала
@@ -65,7 +71,7 @@ main.py                    # есть — точка входа: собрать 
 pre-commit, ruff/black/isort/pylint/mypy/bandit/pip-audit, `bin/ci`, `bin/check_coverage`,
 строгий git-workflow. `bin/ci` зелёный на скелете.
 
-### Фаза 1 — Overlay (мок)  · ветка `feat/overlay-mvp`
+### Фаза 1 — Overlay (мок) ✅  · ветка `feat/overlay-mvp`
 **Цель:** полезного ответа ещё нет, но есть незаметное окно со стелс-контролами и
 замоканным «стримом».
 
@@ -77,7 +83,7 @@ pre-commit, ruff/black/isort/pylint/mypy/bandit/pip-audit, `bin/ci`, `bin/check_
 | **Тесты** | логика состояний оверлея (уровни opacity, compact, panic, auto-hide) через `pytest-qt` (добавить в dev-deps); сигнал «append token» дописывает текст |
 | **Риски** | прозрачность/ click-through на macOS капризны — проверить флаги рано |
 
-### Фаза 2 — Screenshot → Claude  · ветка `feat/screenshot-claude`
+### Фаза 2 — Screenshot → Claude ✅  · ветка `feat/screenshot-claude`
 **Цель:** первый реально полезный инструмент — скрин экрана уходит в Claude, ответ стримится.
 
 | | |
@@ -88,7 +94,7 @@ pre-commit, ruff/black/isort/pylint/mypy/bandit/pip-audit, `bin/ci`, `bin/check_
 | **Тесты** | base64 из `screencapture` (mock subprocess) + fallback mss; сборка мультимодального запроса и выбор системного промпта по режиму (mock `anthropic` client/stream) |
 | **Покрытие** | `src/llm` ≥ 95 %, `src/vision` ≥ 90 % |
 
-### Фаза 3 — Hotkeys (+ panic)  · ветка `feat/hotkeys`
+### Фаза 3 — Hotkeys (+ panic) ✅  · ветка `feat/hotkeys`
 | | |
 |---|---|
 | **Файлы** | `src/core/controller.py` (общий `on_capture`), менеджер хоткеев на `pynput`, конфиг биндингов |
@@ -96,7 +102,7 @@ pre-commit, ruff/black/isort/pylint/mypy/bandit/pip-audit, `bin/ci`, `bin/check_
 | **Приёмка** | хоткеи срабатывают глобально (нужен Accessibility); panic мгновенный |
 | **Тесты** | маппинг хоткей→callback; оркестрация `on_capture` (mock screenshot+claude+overlay) |
 
-### Фаза 4 — Ручной ввод текста  · ветка `feat/manual-input`
+### Фаза 4 — Ручной ввод текста ✅  · ветка `feat/manual-input`
 **Цель:** напечатать вопрос быстрее, чем ждать STT. Постоянная фича.
 
 | | |
@@ -120,7 +126,7 @@ pre-commit, ruff/black/isort/pylint/mypy/bandit/pip-audit, `bin/ci`, `bin/check_
 | **Тесты** | контракт `STTEngine`; буферизация capture (mock `sounddevice`); логика финализации по таймауту (без реального звука) |
 | **Покрытие** | `src/audio` ≥ 90 % |
 
-### Фаза 6 — Rolling context  · ветка `feat/rolling-context`
+### Фаза 6 — Rolling context ✅  · ветка `feat/rolling-context`
 | | |
 |---|---|
 | **Файлы** | `src/core/context.py`, интеграция в `controller` |
