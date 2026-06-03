@@ -17,8 +17,8 @@ line under `[Unreleased]`**.
 - **Configurable STT language** via `SUFLER_STT_LANGUAGE` (empty = auto-detect, best for mixed
   ru+en speech; set `ru` / `en` to pin a single language and drop auto-detection garbage). The
   code default already targets `whisper-large-v3-turbo`. _feat(config)_
-- **Brand shown as "Sufler"** — capitalized window title, a new left-aligned in-window header,
-  and the macOS bundle display name (Dock / ⌘-Tab). _feat(ui)_
+- **Brand shown as "Sufler"** in the macOS Dock / ⌘-Tab (bundle display name); the window itself
+  has no title text (macOS centers native titles, with no Qt way to left-align them). _feat(ui)_
 - **Microphone input-volume slider** + a **live input-level meter** in the overlay — adjust the
   system mic gain without opening System Settings, and see the mic working at a glance (the meter
   bars turn amber/red to warn of clipping). Muting the mic dims these controls and drops the meter

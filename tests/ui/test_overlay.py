@@ -378,17 +378,10 @@ def test_set_mic_enabled_false_disables_and_mutes(overlay: Overlay) -> None:
 # --------------------------------------------------------------------------- #
 # Brand title
 # --------------------------------------------------------------------------- #
-def test_window_title_is_capitalized(overlay: Overlay) -> None:
-    """The window title uses the capitalized brand name."""
+def test_window_has_no_title_text(overlay: Overlay) -> None:
+    """The window shows no title text (macOS centers titles; the brand lives in the Dock)."""
     # Assert
-    assert overlay.windowTitle() == "Sufler"
-
-
-def test_header_shows_capitalized_left_aligned_brand(overlay: Overlay) -> None:
-    """The in-window header shows 'Sufler' (capitalized) and is left-aligned."""
-    # Assert
-    assert overlay._header_label.text() == "Sufler"
-    assert bool(overlay._header_label.alignment() & Qt.AlignmentFlag.AlignLeft)
+    assert overlay.windowTitle() == ""
 
 
 # --------------------------------------------------------------------------- #
