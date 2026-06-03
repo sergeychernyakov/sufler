@@ -8,14 +8,13 @@ It initializes the necessary components and starts the main program flow.
 """
 
 import sys
-from typing import NoReturn
 
 from src.helpers.logger import get_logger
 
 logger = get_logger(__name__)
 
 
-def main() -> NoReturn:
+def main() -> None:
     """
     Main function that runs the application.
 
@@ -23,7 +22,7 @@ def main() -> NoReturn:
     and runs the main program logic.
 
     Returns:
-        NoReturn: This function runs indefinitely or exits via sys.exit()
+        None
     """
     logger.info("Starting application")
 

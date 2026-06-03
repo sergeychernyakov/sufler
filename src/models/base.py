@@ -34,7 +34,7 @@ class Base(BaseModel):
             self._validation_errors = None
             return True
         except ValidationError as e:
-            self._validation_errors = {err["loc"][0]: err["msg"] for err in e.errors()}
+            self._validation_errors = {str(err["loc"][0]): err["msg"] for err in e.errors()}
             return False
 
     def get_validation_errors(self) -> Optional[Dict[str, str]]:
@@ -42,7 +42,7 @@ class Base(BaseModel):
         return self._validation_errors
 
     @classmethod
-    def validate_phone_number(cls, v: Any, field_name: str) -> str:
+    def validate_phone_number(cls, v: Any, field_name: str) -> Optional[str]:
         """
         Validates UK phone numbers.
 
@@ -57,7 +57,7 @@ class Base(BaseModel):
             ValueError: If the phone number is invalid.
         """
         if v is None:
-            return v
+            return None
         v = str(v)
         if re.fullmatch(r"^\d{9,10}$", v) and not v.startswith("0"):
             v = "0" + v
@@ -68,7 +68,7 @@ class Base(BaseModel):
 
         if v in ["07123456789", "03123456789"]:
             raise ValueError(f"{field_name} cannot be a dummy phone number.")
-        return v
+        return str(v)
 
     @classmethod
     def validate_email_address(cls, v: str, field_name: str) -> str:
@@ -92,7 +92,7 @@ class Base(BaseModel):
         return v
 
     @classmethod
-    def validate_zipcode(cls, v: Any) -> str:
+    def validate_zipcode(cls, v: Any) -> Optional[str]:
         """
         Validates UK postal codes using a regex pattern.
 
@@ -106,7 +106,7 @@ class Base(BaseModel):
             ValueError: If the postal code is invalid.
         """
         if v is None:
-            return v
+            return None
         if not re.fullmatch(r"[A-Z]{1,2}\d[A-Z\d]? \d[A-Z]{2}", v, re.IGNORECASE):
             raise ValueError("PostalCode must be a valid UK postal code (e.g., SW1A 1AA).")
-        return v
+        return str(v)

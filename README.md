@@ -1,18 +1,39 @@
-# blank_python_project
+# sufler
+
+AI-суфлёр для технических собеседований (macOS / Apple Silicon). See **[`SUFLER_SPEC.md`](./SUFLER_SPEC.md)** for the product spec and build order.
 
 ## Overview
 
-A Python project template with pre-configured development tools, logging with rotation, code quality checks, and Claude Code AI agents for automated development workflows.
+A Python desktop app (PyQt6 overlay + Claude + screenshots, later microphone STT) with a strict, automated quality toolchain: pre-commit hooks, linters, formatters, type checking, security scans, tests/coverage, and a one-command local quality gate (`bin/ci`).
 
 ## Features
 
-- **Structured Project Layout**: Organized source code with separate modules for configuration, helpers, and models
-- **Logging with Rotation**: Centralized logging system with automatic file rotation (10MB per file, 5 backups)
-- **Pre-commit Hooks**: Automated code formatting and quality checks using isort, black, ruff, and pylint
-- **Type Hints**: Full type annotation support throughout the codebase
-- **Environment-based Configuration**: Development and production configurations
-- **Main Entry Point**: Ready-to-use application entry point with proper error handling
-- **Claude Code Agents**: Pre-configured AI agents for automated SDLC workflows (planner, architect, coder, reviewer, QA)
+**Product** — see **[`docs/DEVELOPMENT_PLAN.md`](./docs/DEVELOPMENT_PLAN.md)** for the build order:
+
+- **Stealth overlay** (PyQt6): translucent, always-on-top, with click-through, opacity & compact modes and a panic-hide hotkey
+- **Screenshot → Claude**: multimodal request (text + screen image) with streamed answers; `coach` / `answer` modes
+- **Manual question input** + **global hotkeys** (incl. panic)
+- **Planned**: local STT (whisper.cpp / MLX), 30–60 s rolling context, loopback audio (BlackHole)
+
+**Engineering:**
+
+- **Quality Gates**: pre-commit hooks + `bin/ci` running isort, black, ruff, pylint (≥9.5), mypy, bandit, pip-audit, secret scan, and pytest + coverage (90 %+)
+- **Strict Git Workflow**: protected `main`, Conventional Commits, feature-branch naming (see `docs/COMMIT_CONVENTION.md`)
+- **Type hints everywhere** + Google-style docstrings; logging with rotation (10 MB × 5)
+- **Claude Code Agents**: pre-configured AI agents for SDLC workflows (planner, architect, coder, reviewer, QA)
+
+## macOS prerequisites
+
+Target: **macOS on Apple Silicon**, Python 3.11+.
+
+Grant these to the app/terminal you launch from (System Settings → Privacy & Security):
+
+- **Screen Recording** — otherwise screenshots come out black
+- **Accessibility** — required for global hotkeys (`pynput`)
+- **Microphone** — for STT (Phase 5+)
+
+Apple Silicon STT uses whisper.cpp (Metal) or `mlx-whisper` (native) — **not**
+faster-whisper (its CTranslate2 backend is CPU-only on Mac).
 
 ## Setup
 
@@ -21,8 +42,8 @@ A Python project template with pre-configured development tools, logging with ro
 Begin by cloning the repository to your local machine:
 
 ```bash
-git clone https://github.com/sergeychernyakov/blank_python_project.git
-cd blank_python_project
+git clone https://github.com/sergeychernyakov/sufler.git
+cd sufler
 ```
 
 ### 2. Create a Virtual Environment
@@ -49,12 +70,22 @@ Activate the virtual environment before installing dependencies.
     .venv\Scripts\activate
     ```
 
-### 4. Install Dependencies
+### 4. Install Dependencies & Hooks
 
-Install the required packages using `pip`:
+Recommended — one command bootstraps the venv, installs all deps, and installs the git hooks:
 
 ```bash
-pip install -r requirements.txt
+bin/setup
+```
+
+Or manually:
+
+```bash
+pip install -r requirements.txt       # runtime (the app)
+pip install -r requirements-dev.txt   # quality toolchain
+pre-commit install --install-hooks \
+  --hook-type pre-commit --hook-type commit-msg \
+  --hook-type pre-push --hook-type post-checkout
 ```
 
 ### 5. Configure Environment Variables
@@ -67,37 +98,56 @@ APP_ENV=development
 
 - Ensure that the `.env` file is **not** committed to version control to protect sensitive information.
 
-### 6. Export Installed Packages (Optional)
+### 6. Managing Dependencies
 
-If you add new dependencies during development, update the `requirements.txt` file:
+Add new dependencies **by hand** to the right file — never `pip freeze` (it pollutes
+the list with transitive packages):
+
+- runtime deps → `requirements.txt`
+- dev/quality tools → `requirements-dev.txt`
+
+## Quality Gates
+
+All quality automation is wired into **pre-commit hooks** and a local runner, **`bin/ci`**.
+
+### Run everything locally
 
 ```bash
-pip freeze > requirements.txt
+bin/ci            # all gates (scaffold-aware: skips checks with no code/tests yet)
+bin/ci --fast     # skip network/slow checks (pip-audit)
 ```
 
-## Pre-commit Hooks
+### Checks
 
-This project uses pre-commit hooks to ensure code quality:
+| Stage        | Tools |
+|--------------|-------|
+| Format       | `black`, `isort` (profile black, line length 120) |
+| Lint         | `ruff` (fast), `pylint` (deep, score ≥ 9.5) |
+| Types        | `mypy` (`disallow_untyped_defs`) |
+| Security     | `bandit`, `pip-audit`, secret scan, `detect-private-key` |
+| Tests        | `pytest` + `coverage` (global ≥ 90 %; `llm`/`core` ≥ 95 %, `audio`/`vision` ≥ 90 %) |
+| Git policy   | protected `main`, Conventional Commits, branch-name warning |
 
-### Tools Used:
-- **isort**: Sorts and organizes imports
-- **black**: Formats code to a consistent style
-- **ruff**: Fast Python linter
-- **pylint**: Code quality checker (minimum score: 10.0)
-- **pytest**: Runs tests with coverage requirement (90%+)
+Configuration lives in `pyproject.toml` (black/isort/ruff/mypy/pytest/coverage/bandit)
+and `.pylintrc`. Hooks are defined in `.pre-commit-config.yaml`.
 
-### Setup:
-```bash
-pip install pre-commit
-pre-commit install
-```
+### Hook stages
 
-### Manual Run:
+- **pre-commit**: format, lint, types, security, secret scan, block commits to `main`
+- **commit-msg**: Conventional Commit format
+- **pre-push**: tests + coverage, `pip-audit`, block pushes to `main`
+- **post-checkout**: branch-name convention warning
+
+Run hooks manually against everything:
+
 ```bash
 pre-commit run --all-files
 ```
 
-Pre-commit will automatically run on every commit to ensure code quality.
+### Git workflow
+
+`main` is protected. Work on feature branches with Conventional Commit messages —
+see **[`docs/COMMIT_CONVENTION.md`](./docs/COMMIT_CONVENTION.md)**.
 
 
 ## Usage
@@ -110,7 +160,8 @@ To run the main application:
 python main.py
 ```
 
-The application will:
+Today `main.py` is the skeleton entry point — the overlay app is built
+incrementally (see [`docs/DEVELOPMENT_PLAN.md`](./docs/DEVELOPMENT_PLAN.md)). It will:
 1. Initialize the logging system with rotation
 2. Run the main application logic
 3. Handle graceful shutdown on interruption (Ctrl+C)
@@ -133,11 +184,25 @@ logger.error("An error occurred", exc_info=True)
 ```
 .
 ├── README.md
-├── CLAUDE.md              # AI assistant instructions
+├── SUFLER_SPEC.md         # Product spec & build order
+├── AGENTS.md / CLAUDE.md  # AI assistant instructions (CLAUDE.md -> AGENTS.md)
 ├── PYTHON_STYLE_GUIDE.md  # Python coding standards
+├── pyproject.toml         # black/isort/ruff/mypy/pytest/coverage/bandit config
+├── .pylintrc              # pylint config (score >= 9.5)
+├── .editorconfig          # editor defaults
+├── .pre-commit-config.yaml
+├── requirements.txt       # runtime dependencies
+├── requirements-dev.txt   # dev/quality toolchain
 ├── main.py                # Application entry point
+├── bin/                   # dev scripts
+│   ├── setup              # bootstrap venv + deps + hooks
+│   ├── ci                 # run all quality gates locally
+│   ├── check_coverage     # per-package coverage thresholds
+│   └── hooks/             # git-hook helper scripts
+├── docs/
+│   ├── COMMIT_CONVENTION.md
+│   └── DEVELOPMENT_PLAN.md # phases, architecture, acceptance criteria
 ├── media/                 # Media assets
-├── requirements.txt       # Python dependencies
 ├── .claude/              # Claude Code configuration
 │   └── agents/           # AI agent definitions
 │       ├── SHARED_CONFIG.md      # Common agent configuration
@@ -147,17 +212,14 @@ logger.error("An error occurred", exc_info=True)
 │       ├── code-reviewer.md      # Code review agent
 │       └── qa-engineer.md        # Quality assurance agent
 ├── src/
-│   ├── __init__.py
-│   ├── config/           # Configuration module
-│   │   ├── __init__.py
-│   │   └── settings.py   # Environment-based settings
-│   ├── helpers/          # Utility modules
-│   │   ├── __init__.py
-│   │   └── logger.py     # Logging with rotation
-│   └── models/           # Data models
-│       ├── __init__.py
-│       ├── base.py       # Base model with validation
-│       └── enums.py      # Enumerations
+│   ├── config/           # settings (env-based: API key, model, mode, hotkeys)
+│   ├── helpers/          # logger (rotation)
+│   ├── models/           # Pydantic base + enums
+│   ├── ui/               # overlay (PyQt6, stealth)          — planned, Phase 1
+│   ├── vision/           # screenshot (screencapture/mss)    — planned, Phase 2
+│   ├── llm/              # claude.py (multimodal + stream)   — planned, Phase 2
+│   ├── audio/            # capture + stt (whisper.cpp/MLX)   — planned, Phase 5
+│   └── core/             # controller + rolling context      — planned, Phase 3/6
 ├── tests/                # Unit tests
 │   └── __init__.py
 ├── artifacts/            # Agent outputs (created during workflows)
@@ -176,6 +238,7 @@ logger.error("An error occurred", exc_info=True)
   - **`config/`**: Configuration management with environment-based settings
   - **`helpers/`**: Utility modules including the logger with rotation
   - **`models/`**: Data models with Pydantic base model and enumerations
+  - **`ui/`, `vision/`, `llm/`, `audio/`, `core/`**: application modules, added per [`docs/DEVELOPMENT_PLAN.md`](./docs/DEVELOPMENT_PLAN.md)
 - **`tests/`**: Unit tests for various components
 - **`artifacts/`**: Agent-generated outputs during development workflows (created automatically)
 - **`tmp/logs/`**: Log files with automatic rotation (10MB limit, 5 backups)
@@ -230,7 +293,7 @@ This project includes pre-configured AI agents for automated software developmen
 5. **QA Engineer Agent** (`qa-engineer.md`)
    - Runs automated tests and quality gates
    - Executes static analysis (ruff, mypy, pylint)
-   - Validates test coverage (≥85%)
+   - Validates test coverage (≥90%)
    - Generates comprehensive quality reports
 
 ### Workflow Example
@@ -256,7 +319,7 @@ For implementing a new feature:
 - **Quality Gates**: Automated checks at each stage
 - **PR Integration**: Automatic GitHub PR creation and updates
 - **Scope Management**: Strict limits on change size (BUGFIX: <50 lines, FEATURE: <200 lines)
-- **Test Coverage**: Minimum 85% code coverage requirement
+- **Test Coverage**: Minimum 90% code coverage requirement
 
 ## Author
 

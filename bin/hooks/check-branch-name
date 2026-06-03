@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# bin/hooks/check-branch-name — warn (never block) on non-conventional branch names.
+#
+# post-checkout passes: <prev_head> <new_head> <branch_flag>
+# branch_flag == 1 means a branch checkout (vs. a file checkout).
+
+branch_flag="${3:-1}"
+[ "$branch_flag" = "1" ] || exit 0
+
+branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+case "$branch" in
+  "" | HEAD | main | master) exit 0 ;;
+esac
+
+pattern='^(feat|fix|refactor|perf|test|docs|chore|security|hotfix|build|ci)/[a-z0-9][a-z0-9._-]*$'
+if ! printf '%s' "$branch" | grep -qE "$pattern"; then
+  echo ""
+  echo "WARNING: branch '${branch}' does not follow the naming convention."
+  echo "  Format: <type>/<short-description>   e.g.  feat/overlay-stealth"
+  echo "  See docs/COMMIT_CONVENTION.md"
+  echo ""
+fi
+exit 0

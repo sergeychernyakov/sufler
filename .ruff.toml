@@ -1,4 +1,0 @@
-line-length = 120
-exclude = ["tmp", "media"]
-
-per-file-ignores = { "tests/**/*" = ["F401", "E402", "F841"] }

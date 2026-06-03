@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+# bin/check_coverage
+"""Enforce global and per-package coverage thresholds (scaffold-aware).
+
+Reads ``coverage.json`` (produced by ``coverage json``) and fails when a
+critical package, or the project as a whole, falls below its threshold.
+
+Global 90% can be gamed by testing trivial helpers, so critical packages
+(the LLM call, the controller/context, the audio + vision pipelines) carry a
+higher bar. While the project is still a skeleton — zero coverage or fewer
+than ``MIN_PACKAGE_STATEMENTS`` measured statements — enforcement is skipped
+so the gate never blocks before real code and tests exist.
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+from typing import Tuple
+
+COVERAGE_FILE = Path("coverage.json")
+GLOBAL_THRESHOLD = 90.0
+MIN_PACKAGE_STATEMENTS = 10
+
+# Critical packages get a higher bar. Paths are matched as prefixes and are
+# skipped cleanly until the corresponding modules land (see SUFLER_SPEC.md).
+CRITICAL_THRESHOLDS = {
+    "src/llm": 95.0,      # Claude request/stream — the core IO path
+    "src/core": 95.0,     # controller + rolling context — orchestration
+    "src/audio": 90.0,    # STT capture/finalisation
+    "src/vision": 90.0,   # screenshot capture
+}
+
+
+def _load() -> dict:
+    """Load coverage.json or exit cleanly if it is missing."""
+    if not COVERAGE_FILE.exists():
+        print(f"  SKIP  coverage gate (no {COVERAGE_FILE} — run tests first)")
+        sys.exit(0)
+    return json.loads(COVERAGE_FILE.read_text(encoding="utf-8"))
+
+
+def _package_stats(files: dict, prefix: str) -> Tuple[int, int]:
+    """Return (statements, covered_lines) summed across files under ``prefix``."""
+    statements = 0
+    covered = 0
+    for path, data in files.items():
+        if not path.replace("\\", "/").startswith(prefix):
+            continue
+        summary = data.get("summary", {})
+        statements += int(summary.get("num_statements", 0))
+        covered += int(summary.get("covered_lines", 0))
+    return statements, covered
+
+
+def main() -> int:
+    """Evaluate every threshold and return a process exit code."""
+    data = _load()
+    files = data.get("files", {})
+    totals = data.get("totals", {})
+    failures = []
+
+    global_pct = float(totals.get("percent_covered", 0.0))
+    total_statements = int(totals.get("num_statements", 0))
+
+    for prefix, threshold in sorted(CRITICAL_THRESHOLDS.items()):
+        statements, covered = _package_stats(files, prefix)
+        if statements == 0:
+            print(f"  SKIP  {prefix} (no measured files yet)")
+            continue
+        if statements < MIN_PACKAGE_STATEMENTS:
+            print(f"  SKIP  {prefix} ({statements} stmts < {MIN_PACKAGE_STATEMENTS} minimum)")
+            continue
+        pct = covered / statements * 100.0
+        status = "PASS" if pct >= threshold else "FAIL"
+        print(f"  {status}  {prefix}: {pct:.2f}% (threshold {threshold:.0f}%)")
+        if pct < threshold:
+            failures.append((prefix, pct, threshold))
+
+    if total_statements < MIN_PACKAGE_STATEMENTS or global_pct == 0.0:
+        print(f"  SKIP  global ({total_statements} stmts / {global_pct:.2f}% — scaffold state)")
+    else:
+        status = "PASS" if global_pct >= GLOBAL_THRESHOLD else "FAIL"
+        print(f"  {status}  global: {global_pct:.2f}% (threshold {GLOBAL_THRESHOLD:.0f}%)")
+        if global_pct < GLOBAL_THRESHOLD:
+            failures.append(("global", global_pct, GLOBAL_THRESHOLD))
+
+    if failures:
+        print("\n  coverage gate FAILED:")
+        for name, actual, threshold in failures:
+            print(f"    {name}: {actual:.2f}% < {threshold:.0f}%")
+        return 1
+
+    print("\n  coverage gate PASSED")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
