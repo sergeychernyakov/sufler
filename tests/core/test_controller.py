@@ -21,6 +21,7 @@ class _FakeOverlay:
         self.shown_answers: list[str] = []
         self.back_visible = False
         self.forward_visible = False
+        self.pinned = False
         self.begun = 0
         self.ended = 0
         self.hidden = 0
@@ -51,6 +52,9 @@ class _FakeOverlay:
 
     def set_forward_visible(self, visible: bool) -> None:
         self.forward_visible = visible
+
+    def set_pinned(self, pinned: bool) -> None:
+        self.pinned = pinned
 
     def answer_raw(self) -> str:
         return "".join(self.answer_tokens)
@@ -343,6 +347,22 @@ def test_on_language_changed_sets_answer_lang(monkeypatch: pytest.MonkeyPatch) -
     controller, _, _, _ = _make()
     controller.on_language_changed("en")
     assert config.answer_lang == "en"
+
+
+def test_pinned_auto_answer_queues_forward_without_changing_view() -> None:
+    controller, overlay, claude, _ = _make()
+    controller.on_submit_text("первый вопрос")  # visible answer "ab"
+    controller.set_pinned(True)
+    assert overlay.pinned is True
+    visible_before = overlay.questions[-1]
+
+    controller.final_speech.emit("что такое mutex?")  # pinned -> background, queued forward
+
+    assert overlay.questions[-1] == visible_before  # frozen view unchanged
+    assert overlay.forward_visible is True  # a queued answer is reachable via →
+    controller.on_forward()
+    assert "mutex" in overlay.questions[-1]  # → reveals the queued answer
+    assert overlay.shown_answers[-1] == "ab"
 
 
 def test_back_then_forward_toggles_nav_buttons() -> None:
