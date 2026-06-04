@@ -682,6 +682,14 @@ def test_end_answer_collects_tags_from_terms(overlay: Overlay) -> None:
     assert overlay.tags() == ["MVC", "Active Record", "thread"]  # order of appearance, newest first
 
 
+def test_tags_render_as_chip_buttons(overlay: Overlay) -> None:
+    """Each tag becomes a clickable chip button in the flow layout."""
+    overlay.add_tags(["REST", "thread"])
+    chips = overlay._tags_container.findChildren(type(overlay._copy_button), "tagChip")
+    labels = {c.text() for c in chips}
+    assert {"REST", "thread"} <= labels
+
+
 def test_add_tags_dedups_prepends_and_caps_at_20(overlay: Overlay) -> None:
     """New unique tags go to the front; duplicates are ignored; list is capped at 20."""
     overlay.add_tags(["a", "b"])
@@ -691,9 +699,21 @@ def test_add_tags_dedups_prepends_and_caps_at_20(overlay: Overlay) -> None:
     assert len(overlay.tags()) == 20
 
 
-def test_tag_click_emits_term_activated(overlay: Overlay, qtbot) -> None:
-    """A tag link click drills down via the same ``term_activated`` signal."""
+def test_tag_chip_click_emits_term_activated(overlay: Overlay, qtbot) -> None:
+    """Clicking a tag chip drills down via the ``term_activated`` signal."""
     overlay.add_tags(["REST"])
+    chip = overlay._tags_container.findChildren(type(overlay._copy_button), "tagChip")[0]
     with qtbot.waitSignal(overlay.term_activated, timeout=1000) as blocker:
-        overlay._tags_label.linkActivated.emit("term:REST")
+        chip.click()
     assert blocker.args == ["REST"]
+
+
+def test_pin_button_toggles_and_emits(overlay: Overlay, qtbot) -> None:
+    """The pin button is off by default, emits ``pin_toggled`` and reflects set_pinned."""
+    assert overlay.is_pinned() is False
+    with qtbot.waitSignal(overlay.pin_toggled, timeout=1000) as blocker:
+        overlay._pin_button.click()
+    assert blocker.args == [True]
+    assert overlay.is_pinned() is True
+    overlay.set_pinned(False)
+    assert overlay.is_pinned() is False

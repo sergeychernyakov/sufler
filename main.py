@@ -75,6 +75,7 @@ def build_app(*, claude: Optional[AnswerClient] = None) -> tuple[Overlay, Contro
     overlay.forward_requested.connect(controller.on_forward)
     overlay.model_changed.connect(controller.on_model_changed)
     overlay.language_changed.connect(controller.on_language_changed)
+    overlay.pin_toggled.connect(controller.set_pinned)
     overlay.set_models(list(available_models()), current_model())
     overlay.set_language(config.answer_lang)
 

@@ -122,6 +122,7 @@ class Controller(QObject):
     final_speech = pyqtSignal(str)
     speech_level = pyqtSignal(float)
     stream_finished = pyqtSignal()
+    background_answer = pyqtSignal(str, str)  # (question, raw answer) produced while pinned
 
     def __init__(
         self,
@@ -160,6 +161,8 @@ class Controller(QObject):
         self._hide_delay = hide_delay
         self._set_input_volume = set_input_volume
         self.auto_answer = auto_answer
+        #: When pinned, the visible answer is frozen and new auto-answers queue forward.
+        self._pinned: bool = False
         #: Monotonic time of the last auto-answer (drives the cooldown).
         self._last_auto_answer: float = 0.0
         self._speech: Optional[SpeechControl] = None
@@ -173,6 +176,7 @@ class Controller(QObject):
         self.final_speech.connect(self._on_final_speech)
         self.speech_level.connect(self._overlay.set_input_level)
         self.stream_finished.connect(self._overlay.end_answer)
+        self.background_answer.connect(self._on_background_answer)
 
     # ------------------------------------------------------------------ #
     # Entry points (the single "on_capture" surface from the spec)
@@ -337,8 +341,9 @@ class Controller(QObject):
     # Live speech (STT) slots — invoked on the UI thread via signals
     # ------------------------------------------------------------------ #
     def _on_partial_speech(self, text: str) -> None:
-        """Shows live (draft) recognised speech in the question field."""
-        self._overlay.set_question(text)
+        """Shows live (draft) recognised speech in the question field (unless pinned)."""
+        if not self._pinned:
+            self._overlay.set_question(text)
 
     def _on_final_speech(self, text: str) -> None:
         """Records a finalised utterance, then auto-answers it when enabled.
@@ -348,12 +353,17 @@ class Controller(QObject):
         """
         self._context.add_speech(text)
         self._context.set_question(text)
-        self._overlay.set_question(text)
-        self._overlay.append_transcript(text)
+        self._overlay.append_transcript(text)  # recognition feed keeps flowing even when pinned
+        if not self._pinned:
+            self._overlay.set_question(text)
         if self._should_auto_answer(text):
             self._last_auto_answer = time.monotonic()
-            self._navigate_to(text)
-            self._start_stream(text, image_b64=None)
+            if self._pinned:
+                # Don't disturb the frozen answer; compute in the background and queue forward.
+                self._start_stream_background(text)
+            else:
+                self._navigate_to(text)
+                self._start_stream(text, image_b64=None)
 
     def _should_auto_answer(self, text: str) -> bool:
         """Decides whether a recognized utterance should be auto-answered.
@@ -400,6 +410,41 @@ class Controller(QObject):
             return None
         finally:
             self._overlay.show()
+
+    def set_pinned(self, pinned: bool) -> None:
+        """Freezes/unfreezes the visible answer.
+
+        While pinned, auto-answers are computed in the background and appended to the
+        forward history (reachable with → / :meth:`on_forward`) instead of replacing
+        the frozen answer.
+
+        Args:
+            pinned (bool): ``True`` to freeze the current answer.
+        """
+        self._pinned = pinned
+        self._overlay.set_pinned(pinned)
+        logger.info("Pin %s", "on" if pinned else "off")
+
+    def _start_stream_background(self, question: str) -> None:
+        """Streams an answer without touching the visible area; queues it forward when done."""
+        context_text = self._context.render() or None
+
+        def work() -> None:
+            tokens: list[str] = []
+            try:
+                for token in self._claude.stream_answer(question, image_b64=None, context=context_text, mode=self.mode):
+                    tokens.append(token)
+            except Exception:  # noqa: BLE001  # pylint: disable=broad-exception-caught
+                logger.exception("Background answer stream failed")
+                return
+            self.background_answer.emit(question, "".join(tokens))
+
+        self._runner(work)
+
+    def _on_background_answer(self, question: str, raw: str) -> None:
+        """Queues a background (pinned) answer onto forward history, oldest revealed first."""
+        self._fwd_stack.insert(0, (question, raw))
+        self._update_nav_buttons()
 
     def _start_stream(self, question: str, *, image_b64: Optional[str]) -> None:
         """Begin a fresh answer and stream Claude tokens into the overlay."""

@@ -117,6 +117,83 @@ class _LevelMeter(QtWidgets.QWidget):
         painter.end()
 
 
+class _FlowLayout(QtWidgets.QLayout):
+    """A layout that arranges its items left-to-right, wrapping to new rows as needed.
+
+    Used for the tag cloud so chips flow and wrap like word-wrapped text.
+    """
+
+    def __init__(self, parent: QtWidgets.QWidget | None = None, spacing: int = 4) -> None:
+        """Creates an empty flow layout with uniform item spacing."""
+        super().__init__(parent)
+        self._items: list[QtWidgets.QLayoutItem] = []
+        self.setSpacing(spacing)
+        self.setContentsMargins(0, 0, 0, 0)
+
+    def addItem(self, item: QtWidgets.QLayoutItem | None) -> None:  # noqa: N802  (Qt override)
+        """Appends a layout item."""
+        if item is not None:
+            self._items.append(item)
+
+    def count(self) -> int:
+        """Returns the number of items."""
+        return len(self._items)
+
+    def itemAt(self, index: int) -> QtWidgets.QLayoutItem | None:  # noqa: N802  (Qt override)
+        """Returns the item at ``index`` (or ``None``)."""
+        return self._items[index] if 0 <= index < len(self._items) else None
+
+    def takeAt(self, index: int) -> QtWidgets.QLayoutItem | None:  # noqa: N802  (Qt override)
+        """Removes and returns the item at ``index`` (or ``None``)."""
+        return self._items.pop(index) if 0 <= index < len(self._items) else None
+
+    def expandingDirections(self) -> Qt.Orientation:  # noqa: N802  (Qt override)
+        """No expanding directions (the layout hugs its content)."""
+        return Qt.Orientation(0)
+
+    def hasHeightForWidth(self) -> bool:  # noqa: N802  (Qt override)
+        """Height depends on width (items wrap)."""
+        return True
+
+    def heightForWidth(self, width: int) -> int:  # noqa: N802  (Qt override)
+        """Returns the height needed to lay items out within ``width``."""
+        return self._do_layout(QtCore.QRect(0, 0, width, 0), test_only=True)
+
+    def setGeometry(self, rect: QtCore.QRect) -> None:  # noqa: N802  (Qt override)
+        """Lays the items out within ``rect``."""
+        super().setGeometry(rect)
+        self._do_layout(rect, test_only=False)
+
+    def sizeHint(self) -> QtCore.QSize:  # noqa: N802  (Qt override)
+        """Returns the minimum size as the size hint."""
+        return self.minimumSize()
+
+    def minimumSize(self) -> QtCore.QSize:  # noqa: N802  (Qt override)
+        """Returns the minimum size enclosing every item."""
+        size = QtCore.QSize()
+        for item in self._items:
+            size = size.expandedTo(item.minimumSize())
+        margins = self.contentsMargins()
+        size += QtCore.QSize(margins.left() + margins.right(), margins.top() + margins.bottom())
+        return size
+
+    def _do_layout(self, rect: QtCore.QRect, test_only: bool) -> int:
+        """Places items row by row, wrapping at ``rect`` width; returns total height."""
+        x, y, line_height = rect.x(), rect.y(), 0
+        space = self.spacing()
+        for item in self._items:
+            hint = item.sizeHint()
+            if x + hint.width() > rect.right() and line_height > 0:
+                x = rect.x()
+                y += line_height + space
+                line_height = 0
+            if not test_only:
+                item.setGeometry(QtCore.QRect(QtCore.QPoint(x, y), hint))
+            x += hint.width() + space
+            line_height = max(line_height, hint.height())
+        return y + line_height - rect.y()
+
+
 class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attributes,too-many-public-methods
     """Frameless, always-on-top stealth overlay widget.
 
@@ -144,6 +221,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
     forward_requested = pyqtSignal()
     model_changed = pyqtSignal(str)
     language_changed = pyqtSignal(str)
+    pin_toggled = pyqtSignal(bool)
 
     def __init__(self, parent: QtWidgets.QWidget | None = None, *, stealth: bool = False) -> None:
         """Builds the overlay window and lays out widgets.
@@ -401,22 +479,25 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._level_label.setObjectName("controlLabel")
         self._level_meter = _LevelMeter(self)
 
-        # Tag cloud: terms seen in answers, clickable like inline links (newest first, ≤20).
+        # Tag cloud: terms seen in answers as clickable chips (newest first, ≤20), above transcript.
         self._tags: list[str] = []
-        self._tags_label = QtWidgets.QLabel("", self)
-        self._tags_label.setObjectName("tagsLabel")
-        self._tags_label.setWordWrap(True)
-        self._tags_label.setTextFormat(Qt.TextFormat.RichText)
-        self._tags_label.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
-        self._tags_label.setOpenExternalLinks(False)
+        self._tags_container = QtWidgets.QWidget(self)
+        self._tags_flow = _FlowLayout(self._tags_container, spacing=4)
         self._tags_scroll = QtWidgets.QScrollArea(self)
         self._tags_scroll.setObjectName("tagsScroll")
-        self._tags_scroll.setWidget(self._tags_label)
+        self._tags_scroll.setWidget(self._tags_container)
         self._tags_scroll.setWidgetResizable(True)
         self._tags_scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
-        self._tags_scroll.setMaximumHeight(64)
+        self._tags_scroll.setMaximumHeight(60)
         self._tags_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._tags_scroll.hide()  # shown once the first tags arrive
+
+        # Pin: freeze the current answer while sufler keeps answering in the background.
+        self._pin_button = QtWidgets.QPushButton("📌", self)
+        self._pin_button.setObjectName("pinButton")
+        self._pin_button.setCheckable(True)
+        self._pin_button.setToolTip("Закрепить ответ (новые — по стрелке вправо)")
+        self._pin_button.setCursor(Qt.CursorShape.PointingHandCursor)
 
         self.setStyleSheet(self._scaled_stylesheet())
 
@@ -430,20 +511,26 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         nav_row.setSpacing(6)
         nav_row.addWidget(self._back_button)
         nav_row.addWidget(self._question_label, stretch=1)
+        nav_row.addWidget(self._pin_button)
         nav_row.addWidget(self._forward_button)
         layout.addLayout(nav_row)
 
-        # Answer + transcript share a draggable vertical splitter — drag the handle
-        # (the recognition area's top border) to resize it.
+        # Answer (top) and a bottom block of [tag cloud + transcript] share a draggable
+        # vertical splitter — drag the handle to resize. Tags sit ABOVE the recognition.
+        bottom = QtWidgets.QWidget(self)
+        bottom_layout = QtWidgets.QVBoxLayout(bottom)
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
+        bottom_layout.setSpacing(6)
+        bottom_layout.addWidget(self._tags_scroll)
+        bottom_layout.addWidget(self._transcript, stretch=1)
+
         self._body_splitter = QtWidgets.QSplitter(Qt.Orientation.Vertical, self)
         self._body_splitter.addWidget(self._answer_scroll)
-        self._body_splitter.addWidget(self._transcript)
+        self._body_splitter.addWidget(bottom)
         self._body_splitter.setStretchFactor(0, 3)
         self._body_splitter.setStretchFactor(1, 1)
-        self._body_splitter.setSizes([260, 120])
+        self._body_splitter.setSizes([260, 140])
         layout.addWidget(self._body_splitter, stretch=1)
-
-        layout.addWidget(self._tags_scroll)
 
         controls = QtWidgets.QHBoxLayout()
         controls.setSpacing(6)
@@ -483,7 +570,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._model_combo.textActivated.connect(self.model_changed)
         self._lang_combo.textActivated.connect(self.language_changed)
         self._answer_label.linkActivated.connect(self._on_answer_link)
-        self._tags_label.linkActivated.connect(self._on_answer_link)
+        self._pin_button.clicked.connect(self.pin_toggled)
         self._capture_button.clicked.connect(self._on_capture_clicked)
         self._mic_button.clicked.connect(self._on_mic_clicked)
         self._input_field.returnPressed.connect(self._on_input_submitted)
@@ -570,7 +657,8 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
                 font-size: 13px;
             }
             QPushButton#captureButton, QPushButton#sendButton, QPushButton#micButton,
-            QPushButton#backButton, QPushButton#forwardButton, QPushButton#copyButton {
+            QPushButton#backButton, QPushButton#forwardButton, QPushButton#copyButton,
+            QPushButton#pinButton {
                 background-color: rgba(60, 60, 70, 230);
                 border: 1px solid rgba(120, 120, 140, 200);
                 border-radius: 6px;
@@ -578,12 +666,24 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
                 font-size: 15px;
             }
             QPushButton#captureButton:hover, QPushButton#sendButton:hover, QPushButton#micButton:hover,
-            QPushButton#backButton:hover, QPushButton#forwardButton:hover, QPushButton#copyButton:hover {
+            QPushButton#backButton:hover, QPushButton#forwardButton:hover, QPushButton#copyButton:hover,
+            QPushButton#pinButton:hover {
                 background-color: rgba(80, 80, 92, 240);
             }
-            QLabel#tagsLabel {
-                color: #9ad1ff;
+            QPushButton#tagChip {
+                background-color: rgba(60, 80, 110, 230);
+                border: 1px solid rgba(120, 160, 210, 200);
+                border-radius: 9px;
+                padding: 2px 9px;
+                color: #cfe8ff;
                 font-size: 11px;
+            }
+            QPushButton#tagChip:hover {
+                background-color: rgba(80, 110, 150, 245);
+            }
+            QPushButton#pinButton:checked {
+                background-color: rgba(150, 120, 36, 235);
+                border-color: rgba(210, 180, 90, 200);
             }
             QComboBox#modelCombo, QComboBox#langCombo {
                 background-color: rgba(40, 40, 48, 230);
@@ -945,16 +1045,41 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         return list(self._tags)
 
     def _render_tags(self) -> None:
-        """Renders the tag cloud as clickable links and shows/hides its row."""
+        """Rebuilds the tag cloud as clickable pill chips and shows/hides its row."""
+        while self._tags_flow.count():
+            item = self._tags_flow.takeAt(0)
+            widget = item.widget() if item is not None else None
+            if widget is not None:
+                widget.deleteLater()
         if not self._tags:
             self._tags_scroll.hide()
             return
-        chips = " ".join(
-            f'<a href="term:{quote(t)}" style="color:#9ad1ff; text-decoration:none;">#{html.escape(t)}</a>'
-            for t in self._tags
-        )
-        self._tags_label.setText(chips)
+        for tag in self._tags:
+            chip = QtWidgets.QPushButton(tag, self._tags_container)
+            chip.setObjectName("tagChip")
+            chip.setCursor(Qt.CursorShape.PointingHandCursor)
+            chip.clicked.connect(lambda _checked=False, t=tag: self.term_activated.emit(t))
+            self._tags_flow.addWidget(chip)
         self._tags_scroll.show()
+
+    # ------------------------------------------------------------------ #
+    # Pin (freeze the current answer)
+    # ------------------------------------------------------------------ #
+    def set_pinned(self, pinned: bool) -> None:
+        """Reflects the pinned state on the pin button (no signal emitted).
+
+        Args:
+            pinned (bool): ``True`` marks the current answer as pinned/frozen.
+        """
+        self._pin_button.setChecked(pinned)
+
+    def is_pinned(self) -> bool:
+        """Returns whether the answer is currently pinned.
+
+        Returns:
+            bool: ``True`` when pinned.
+        """
+        return self._pin_button.isChecked()
 
     def _on_thinking_tick(self) -> None:
         """Advances the 'thinking' spinner shown before the first answer token arrives."""
