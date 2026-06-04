@@ -401,6 +401,23 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._level_label.setObjectName("controlLabel")
         self._level_meter = _LevelMeter(self)
 
+        # Tag cloud: terms seen in answers, clickable like inline links (newest first, ≤20).
+        self._tags: list[str] = []
+        self._tags_label = QtWidgets.QLabel("", self)
+        self._tags_label.setObjectName("tagsLabel")
+        self._tags_label.setWordWrap(True)
+        self._tags_label.setTextFormat(Qt.TextFormat.RichText)
+        self._tags_label.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
+        self._tags_label.setOpenExternalLinks(False)
+        self._tags_scroll = QtWidgets.QScrollArea(self)
+        self._tags_scroll.setObjectName("tagsScroll")
+        self._tags_scroll.setWidget(self._tags_label)
+        self._tags_scroll.setWidgetResizable(True)
+        self._tags_scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        self._tags_scroll.setMaximumHeight(64)
+        self._tags_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._tags_scroll.hide()  # shown once the first tags arrive
+
         self.setStyleSheet(self._scaled_stylesheet())
 
     def _build_layout(self) -> None:
@@ -425,6 +442,8 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._body_splitter.setStretchFactor(1, 1)
         self._body_splitter.setSizes([260, 120])
         layout.addWidget(self._body_splitter, stretch=1)
+
+        layout.addWidget(self._tags_scroll)
 
         controls = QtWidgets.QHBoxLayout()
         controls.setSpacing(6)
@@ -464,6 +483,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._model_combo.textActivated.connect(self.model_changed)
         self._lang_combo.textActivated.connect(self.language_changed)
         self._answer_label.linkActivated.connect(self._on_answer_link)
+        self._tags_label.linkActivated.connect(self._on_answer_link)
         self._capture_button.clicked.connect(self._on_capture_clicked)
         self._mic_button.clicked.connect(self._on_mic_clicked)
         self._input_field.returnPressed.connect(self._on_input_submitted)
@@ -560,6 +580,10 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
             QPushButton#captureButton:hover, QPushButton#sendButton:hover, QPushButton#micButton:hover,
             QPushButton#backButton:hover, QPushButton#forwardButton:hover, QPushButton#copyButton:hover {
                 background-color: rgba(80, 80, 92, 240);
+            }
+            QLabel#tagsLabel {
+                color: #9ad1ff;
+                font-size: 11px;
             }
             QComboBox#modelCombo, QComboBox#langCombo {
                 background-color: rgba(40, 40, 48, 230);
@@ -728,6 +752,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
             self._answer_label.setText("(пустой ответ)")
             return
         self._render_answer(self._answer_raw)
+        self.add_tags(self._extract_terms(self._answer_raw))
 
     def show_answer(self, raw: str) -> None:
         """Displays a finished answer (e.g. when navigating back), with clickable terms.
@@ -874,9 +899,62 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         return "".join(out).replace("\n", "<br>")
 
     def _on_answer_link(self, href: str) -> None:
-        """Emits :pyattr:`term_activated` when a ``**term**`` link in the answer is clicked."""
+        """Emits :pyattr:`term_activated` when a term link (answer or tag) is clicked."""
         if href.startswith("term:"):
             self.term_activated.emit(unquote(href[len("term:") :]))
+
+    @staticmethod
+    def _extract_terms(raw: str) -> list[str]:
+        """Returns the linkable terms (``**bold**`` and `` `code` ``) found in ``raw``, in order.
+
+        Args:
+            raw (str): The raw answer text.
+
+        Returns:
+            list[str]: The terms, in order of appearance (duplicates kept; caller dedups).
+        """
+        terms: list[str] = []
+        for match in re.finditer(r"\*\*(.+?)\*\*|`([^`]+)`", raw):
+            term = (match.group(1) or match.group(2) or "").strip()
+            if term:
+                terms.append(term)
+        return terms
+
+    def add_tags(self, terms: list[str]) -> None:
+        """Adds terms to the tag cloud (newest first, unique, capped at 20).
+
+        Args:
+            terms (list[str]): Terms to prepend; already-present tags are ignored.
+        """
+        existing = {t.lower() for t in self._tags}
+        # Prepend new terms in reverse so the first term of the answer ends up foremost.
+        for term in reversed(terms):
+            key = term.lower()
+            if key and key not in existing:
+                self._tags.insert(0, term)
+                existing.add(key)
+        del self._tags[20:]
+        self._render_tags()
+
+    def tags(self) -> list[str]:
+        """Returns the current tag-cloud terms (newest first).
+
+        Returns:
+            list[str]: The tags currently shown.
+        """
+        return list(self._tags)
+
+    def _render_tags(self) -> None:
+        """Renders the tag cloud as clickable links and shows/hides its row."""
+        if not self._tags:
+            self._tags_scroll.hide()
+            return
+        chips = " ".join(
+            f'<a href="term:{quote(t)}" style="color:#9ad1ff; text-decoration:none;">#{html.escape(t)}</a>'
+            for t in self._tags
+        )
+        self._tags_label.setText(chips)
+        self._tags_scroll.show()
 
     def _on_thinking_tick(self) -> None:
         """Advances the 'thinking' spinner shown before the first answer token arrives."""

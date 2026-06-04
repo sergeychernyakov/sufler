@@ -669,3 +669,31 @@ def test_render_strips_think_blocks(overlay: Overlay) -> None:
 def test_language_combo_has_a_min_width(overlay: Overlay) -> None:
     """The language selector has a sensible minimum width (was clipped)."""
     assert overlay._lang_combo.minimumWidth() >= 48
+
+
+# --------------------------------------------------------------------------- #
+# Tag cloud
+# --------------------------------------------------------------------------- #
+def test_end_answer_collects_tags_from_terms(overlay: Overlay) -> None:
+    """Finishing an answer populates the tag cloud from its **bold** / `code` terms."""
+    overlay.begin_answer()
+    overlay.append_answer("1. **MVC**: про `Active Record` и `thread`")
+    overlay.end_answer()
+    assert overlay.tags() == ["MVC", "Active Record", "thread"]  # order of appearance, newest first
+
+
+def test_add_tags_dedups_prepends_and_caps_at_20(overlay: Overlay) -> None:
+    """New unique tags go to the front; duplicates are ignored; list is capped at 20."""
+    overlay.add_tags(["a", "b"])
+    overlay.add_tags(["b", "c"])  # b is a dup
+    assert overlay.tags()[:3] == ["c", "a", "b"]
+    overlay.add_tags([f"t{i}" for i in range(30)])
+    assert len(overlay.tags()) == 20
+
+
+def test_tag_click_emits_term_activated(overlay: Overlay, qtbot) -> None:
+    """A tag link click drills down via the same ``term_activated`` signal."""
+    overlay.add_tags(["REST"])
+    with qtbot.waitSignal(overlay.term_activated, timeout=1000) as blocker:
+        overlay._tags_label.linkActivated.emit("term:REST")
+    assert blocker.args == ["REST"]
