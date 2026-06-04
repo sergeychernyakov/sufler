@@ -6,7 +6,7 @@ import pytest
 
 from src.config import config
 from src.core.context import RollingContext
-from src.core.controller import CAPTURE_PROMPT, Controller
+from src.core.controller import CAPTURE_PROMPT, Controller, _looks_like_question
 from src.models.enums import Mode
 
 
@@ -265,6 +265,38 @@ def test_final_speech_does_not_answer_when_auto_off() -> None:
     controller = Controller(overlay, claude, RollingContext(), runner=lambda w: w(), auto_answer=False)
     controller.final_speech.emit("что такое REST?")
     assert claude.calls == []
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("что такое REST?", True),
+        ("Чем отличается == от is", True),
+        ("расскажи про индексы", True),
+        ("What is a deadlock", True),
+        ("соответственно изменяемым типом данных относится лист", False),
+        ("вот и всё, это тоже надо понимать", False),
+        ("", False),
+    ],
+)
+def test_looks_like_question(text: str, expected: bool) -> None:
+    assert _looks_like_question(text) is expected
+
+
+def test_monologue_statement_is_not_auto_answered(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(config, "answer_questions_only", True)
+    controller, _, claude, _ = _make()
+    controller.final_speech.emit("дикт и сет вот такой ответ будет хорошо звучать")
+    assert claude.calls == []  # a statement, not a question -> skipped
+
+
+def test_cooldown_blocks_rapid_second_answer(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(config, "answer_cooldown_seconds", 999.0)
+    controller, _, claude, _ = _make()
+    controller.final_speech.emit("что такое mutex?")
+    controller.final_speech.emit("что такое thread?")  # within cooldown -> skipped
+    assert len(claude.calls) == 1
+    assert "mutex" in claude.calls[0]["question"]
 
 
 def test_term_click_drills_down_and_shows_back() -> None:
