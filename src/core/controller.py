@@ -33,6 +33,77 @@ logger = get_logger(__name__)
 CAPTURE_PROMPT = "Ответь кратко на вопрос или задачу, показанную на скриншоте экрана."
 HIDE_BEFORE_CAPTURE_SECONDS = 0.15
 
+#: Interrogatives that mark a recognized utterance as a question worth auto-answering.
+_QUESTION_WORDS: frozenset[str] = frozenset(
+    {
+        # ru
+        "что",
+        "как",
+        "почему",
+        "зачем",
+        "чем",
+        "какой",
+        "какая",
+        "какие",
+        "какое",
+        "кто",
+        "где",
+        "когда",
+        "сколько",
+        "куда",
+        "откуда",
+        "расскажи",
+        "объясни",
+        "назови",
+        "перечисли",
+        "опиши",
+        "сравни",
+        "в чём",
+        "чём",
+        "зачём",
+        # en
+        "what",
+        "how",
+        "why",
+        "when",
+        "where",
+        "which",
+        "who",
+        "whom",
+        "whose",
+        "explain",
+        "describe",
+        "compare",
+        "tell",
+        "name",
+        "list",
+        "define",
+    }
+)
+
+
+def _looks_like_question(text: str) -> bool:
+    """Heuristic: does a recognized utterance look like a question worth answering?
+
+    True when it ends with ``?`` or starts with a known interrogative/imperative word.
+    This filters out the long statements of a monologue so the prompter answers actual
+    questions instead of every speech chunk.
+
+    Args:
+        text (str): The recognized utterance.
+
+    Returns:
+        bool: ``True`` if the text looks like a question/request.
+    """
+    stripped = text.strip()
+    if not stripped:
+        return False
+    if "?" in stripped:
+        return True
+    first = stripped.lower().lstrip("«\"'(-—. ").split(maxsplit=1)[:1]
+    return bool(first) and first[0].strip(".,!:;") in _QUESTION_WORDS
+
+
 Runner = Callable[[Callable[[], None]], None]
 
 
@@ -89,6 +160,8 @@ class Controller(QObject):
         self._hide_delay = hide_delay
         self._set_input_volume = set_input_volume
         self.auto_answer = auto_answer
+        #: Monotonic time of the last auto-answer (drives the cooldown).
+        self._last_auto_answer: float = 0.0
         self._speech: Optional[SpeechControl] = None
         #: Drill-down history: (question, raw answer) of screens we can go back to.
         self._nav_stack: list[tuple[str, str]] = []
@@ -271,9 +344,33 @@ class Controller(QObject):
         self._context.set_question(text)
         self._overlay.set_question(text)
         self._overlay.append_transcript(text)
-        if self.auto_answer:
+        if self._should_auto_answer(text):
+            self._last_auto_answer = time.monotonic()
             self._set_root(text)
             self._start_stream(text, image_b64=None)
+
+    def _should_auto_answer(self, text: str) -> bool:
+        """Decides whether a recognized utterance should be auto-answered.
+
+        Gated by: auto-answer enabled, the question filter (skip monologue statements
+        unless it looks like a question), and a cooldown so a burst of speech does not
+        spam the LLM (free-tier rate limits).
+
+        Args:
+            text (str): The finalized recognized utterance.
+
+        Returns:
+            bool: ``True`` if an answer should be streamed for ``text``.
+        """
+        if not self.auto_answer:
+            return False
+        if config.answer_questions_only and not _looks_like_question(text):
+            logger.debug("Skipping auto-answer (not a question): %r", text[:60])
+            return False
+        if time.monotonic() - self._last_auto_answer < config.answer_cooldown_seconds:
+            logger.debug("Skipping auto-answer (cooldown active)")
+            return False
+        return True
 
     # ------------------------------------------------------------------ #
     # Internals

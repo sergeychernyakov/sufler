@@ -32,9 +32,12 @@ line under `[Unreleased]`**.
   `*_MODEL`. _feat(llm)_
 - **"Thinking" spinner** — an animated indicator in the answer area while the LLM generates,
   replaced by the first streamed token (and showing "(пустой ответ)" if nothing comes back). _feat(ui)_
-- **Auto-answer recognized speech** — each finalized utterance is answered automatically (the live
-  prompter flow): speak a question → it answers. Controlled by the **microphone toggle** (mic off =
-  no recognition = no answers); can be disabled outright via `SUFLER_AUTO_ANSWER=false`. _feat(controller)_
+- **Auto-answer recognized speech** — speak a question → it answers. Controlled by the **microphone
+  toggle** (mic off = no answers); disable via `SUFLER_AUTO_ANSWER=false`. _feat(controller)_
+- **Answer questions only + cooldown** — auto-answer now fires only on utterances that look like a
+  question/request (interrogative or `?`), not on every monologue chunk, and is rate-limited by a
+  cooldown (`SUFLER_ANSWER_COOLDOWN`, default 6 s). This stops the free-tier rate-limit spam and the
+  "answering mid-sentence fragments" problem. Toggle with `SUFLER_ANSWER_QUESTIONS_ONLY`. _feat(controller)_
 - **Drill-down on terms** — the bold `**terms**` and `` `code` `` spans (the English terms) in an
   answer are clickable: tapping one asks the LLM about that term and navigates into a fresh answer
   (unlimited depth). Browser-style **back (←)** / **forward (→)** buttons at the top move through

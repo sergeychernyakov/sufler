@@ -39,6 +39,15 @@ class Config:
     )
     # Number of points/theses the answer should contain.
     answer_points: int = field(default_factory=lambda: int(os.getenv("SUFLER_ANSWER_POINTS", "7") or "7"))
+    # Only auto-answer utterances that look like a question (skip monologue/statements).
+    answer_questions_only: bool = field(
+        default_factory=lambda: os.getenv("SUFLER_ANSWER_QUESTIONS_ONLY", "true").strip().lower()
+        in ("1", "true", "yes", "on")
+    )
+    # Minimum seconds between consecutive auto-answers (rate-limit guard for free tiers).
+    answer_cooldown_seconds: float = field(
+        default_factory=lambda: float(os.getenv("SUFLER_ANSWER_COOLDOWN", "6") or "6")
+    )
 
     # Answer LLM provider: "claude" (Anthropic, paid) or "gemini" (Google, free tier).
     llm_provider: str = field(default_factory=lambda: os.getenv("SUFLER_LLM_PROVIDER", "claude"))
