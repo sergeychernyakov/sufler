@@ -183,7 +183,7 @@ class Controller(QObject):
         image_b64 = self._capture_screenshot()
         self._context.set_screenshot(image_b64)
         self._overlay.set_question("📸 Скриншот экрана")
-        self._set_root("📸 Скриншот экрана")
+        self._navigate_to("📸 Скриншот экрана")
         self._start_stream(CAPTURE_PROMPT, image_b64=image_b64)
 
     def on_submit_text(self, text: str) -> None:
@@ -198,7 +198,7 @@ class Controller(QObject):
         logger.info("on_submit_text (%d chars)", len(question))
         self._context.set_question(question)
         self._overlay.set_question(question)
-        self._set_root(question)
+        self._navigate_to(question)
         self._start_stream(question, image_b64=None)
 
     def on_answer_last(self) -> None:
@@ -209,7 +209,7 @@ class Controller(QObject):
             self._overlay.set_question("(нет распознанной речи)")
             return
         self._overlay.set_question(question)
-        self._set_root(question)
+        self._navigate_to(question)
         self._start_stream(question, image_b64=None)
 
     def panic(self) -> None:
@@ -255,13 +255,10 @@ class Controller(QObject):
         if not term:
             return
         logger.info("on_term_clicked: %r", term)
-        self._nav_stack.append((self._current_question, self._overlay.answer_raw()))
-        self._fwd_stack.clear()
         question = f"Расскажи подробнее про: {term}"
-        self._current_question = question
         self._context.set_question(question)
         self._overlay.set_question(question)
-        self._update_nav_buttons()
+        self._navigate_to(question)
         self._start_stream(question, image_b64=None)
 
     def on_back(self) -> None:
@@ -286,11 +283,20 @@ class Controller(QObject):
         self._overlay.show_answer(answer_raw)
         self._update_nav_buttons()
 
-    def _set_root(self, question: str) -> None:
-        """Begins a fresh answer thread, clearing back/forward history."""
-        self._current_question = question
-        self._nav_stack.clear()
+    def _navigate_to(self, question: str) -> None:
+        """Advances to a new screen, keeping the current one in back history.
+
+        Browser-style: the current screen (if any) is pushed onto the back stack and
+        the forward stack is cleared, so a new question/drill-down does not erase the
+        history of previous hints — back returns to them.
+
+        Args:
+            question (str): The question for the new screen.
+        """
+        if self._current_question:
+            self._nav_stack.append((self._current_question, self._overlay.answer_raw()))
         self._fwd_stack.clear()
+        self._current_question = question
         self._update_nav_buttons()
 
     def _update_nav_buttons(self) -> None:
@@ -346,7 +352,7 @@ class Controller(QObject):
         self._overlay.append_transcript(text)
         if self._should_auto_answer(text):
             self._last_auto_answer = time.monotonic()
-            self._set_root(text)
+            self._navigate_to(text)
             self._start_stream(text, image_b64=None)
 
     def _should_auto_answer(self, text: str) -> bool:

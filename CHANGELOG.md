@@ -44,6 +44,10 @@ line under `[Unreleased]`**.
   the history. _feat(ui)_
 - **Single-word lookup** — typing a bare word + Enter is treated as a definition query ("Что такое
   <word>?" / "What is <word>?" by language). _feat(controller)_
+- **Session-wide back/forward** — a new question no longer clears history; back (←) / forward (→)
+  now move through every previous hint and drill-down (browser-style). _feat(controller)_
+- **Tag cloud** — clickable terms collected from answers appear below the text (newest first, up to
+  20 unique); clicking one drills down just like an inline term link. _feat(ui)_
 - **In-window model selector** — a dropdown switches the answer model on the fly (the active
   provider's free models). _feat(ui)_
 - **Output-language selector** — a dropdown (right of the model selector) sets the answer language

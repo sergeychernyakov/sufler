@@ -322,14 +322,14 @@ def test_back_without_history_is_noop() -> None:
     assert overlay.shown_answers == []
 
 
-def test_new_question_clears_drill_history() -> None:
-    controller, overlay, _, _ = _make()
-    controller.on_submit_text("Q1")
-    controller.on_term_clicked("term")  # back becomes visible
-    controller.on_submit_text("Q2")  # new root clears history
-    assert overlay.back_visible is False
-    controller.on_back()  # nothing to restore
-    assert overlay.shown_answers == []
+def test_new_question_keeps_history_and_back_returns_to_it() -> None:
+    controller, overlay, _, _ = _make()  # answers "ab"
+    controller.on_submit_text("первый вопрос")
+    controller.on_submit_text("второй вопрос")  # a new question is another history step, not a reset
+    assert overlay.back_visible is True
+    controller.on_back()  # back goes to the first question's screen
+    assert overlay.shown_answers[-1] == "ab"
+    assert overlay.questions[-1] == "первый вопрос"
 
 
 def test_on_model_changed_switches_client_model() -> None:
