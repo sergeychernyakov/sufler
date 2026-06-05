@@ -105,6 +105,31 @@ def test_system_prompt_is_mode_specific_and_matches_claude() -> None:
     assert fake.last_messages[0].content == ClaudeClient.build_system_prompt(Mode.ANSWER)
 
 
+def test_screenshot_uses_vision_model_when_default_is_text_only() -> None:
+    """With a screenshot, a non-vision default model falls back to the vision model."""
+    from src.llm.groq import VISION_GROQ_MODEL
+
+    built: list[str] = []
+    client = GroqClient(model="openai/gpt-oss-120b")
+
+    def fake_build(model: str):
+        built.append(model)
+        return _FakeChatModel(["x"])
+
+    client._build_chat = fake_build  # type: ignore[assignment]  # noqa: SLF001
+    list(client.stream_answer("опиши скрин", image_b64="QkFTRTY0"))
+    assert built == [VISION_GROQ_MODEL]
+
+
+def test_text_only_question_uses_configured_model() -> None:
+    """Without a screenshot, the configured (text) model is used as-is."""
+    built: list[str] = []
+    client = GroqClient(model="openai/gpt-oss-120b")
+    client._build_chat = lambda m: built.append(m) or _FakeChatModel(["x"])  # type: ignore[assignment]  # noqa: SLF001,E731
+    list(client.stream_answer("что такое mutex?"))
+    assert built == ["openai/gpt-oss-120b"]
+
+
 def test_set_model_resets_cached_client() -> None:
     """set_model updates the model and drops the cached chat model (forces a rebuild)."""
     client, _ = _make(["x"])

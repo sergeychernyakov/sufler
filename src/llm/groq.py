@@ -22,8 +22,12 @@ from src.models.enums import Mode
 
 logger = get_logger(__name__)
 
-#: Default Groq model — Llama 4 Scout is multimodal (text + vision) and free-tier eligible.
-DEFAULT_GROQ_MODEL: str = "meta-llama/llama-4-scout-17b-16e-instruct"
+#: Default Groq model — gpt-oss-120b is the strongest free reasoning model (text only).
+DEFAULT_GROQ_MODEL: str = "openai/gpt-oss-120b"
+
+#: Multimodal Groq model used automatically when a screenshot is attached (the default
+#: text model can't see images). Llama 4 Scout reads images on the free tier.
+VISION_GROQ_MODEL: str = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 #: Upper bound on streamed answer length (answers are intentionally short).
 _MAX_TOKENS: int = 1024
@@ -60,6 +64,8 @@ class GroqClient:
         self.model: str = model or config.groq_model or DEFAULT_GROQ_MODEL
         self._api_key: str = api_key or config.groq_api_key
         self._client: Optional[Any] = client
+        #: True when a chat model was injected (tests/override) — always reuse it.
+        self._injected: bool = client is not None
 
     def set_model(self, model: str) -> None:
         """Switches the model; the underlying chat model is rebuilt on next use.
@@ -69,6 +75,7 @@ class GroqClient:
         """
         self.model = model
         self._client = None
+        self._injected = False
 
     @staticmethod
     def build_system_prompt(mode: Mode) -> str:
@@ -82,29 +89,48 @@ class GroqClient:
         """
         return ClaudeClient.build_system_prompt(mode)
 
-    def _model_client(self) -> Any:
-        """Builds (once) and returns the LangChain Groq chat model.
+    @staticmethod
+    def _is_vision_model(model: str) -> bool:
+        """Reports whether a Groq model can read images."""
+        low = model.lower()
+        return "llama-4" in low or "vision" in low
 
-        Returns:
-            Any: A ``ChatGroq`` instance.
+    def _build_chat(self, model: str) -> Any:
+        """Constructs a ``ChatGroq`` for ``model``.
 
         Raises:
             RuntimeError: If ``langchain_groq`` is not installed.
         """
+        try:
+            from langchain_groq import ChatGroq  # pylint: disable=import-outside-toplevel
+        except ImportError as exc:
+            raise RuntimeError(
+                "langchain-groq is not installed. Install it with "
+                "`pip install langchain-groq` to use the Groq answer backend."
+            ) from exc
+        return ChatGroq(
+            model=model,
+            api_key=self._api_key or None,  # type: ignore[arg-type]  # str coerced to SecretStr at runtime
+            temperature=0.0,
+            max_tokens=_MAX_TOKENS,
+        )
+
+    def _model_client(self, model: Optional[str] = None) -> Any:
+        """Returns a chat model: the cached default, or a transient one for ``model``.
+
+        Args:
+            model (Optional[str]): An override model id (e.g. the vision model for a
+                screenshot). ``None`` uses (and caches) :attr:`model`.
+
+        Returns:
+            Any: A ``ChatGroq`` instance.
+        """
+        if self._injected:  # an explicitly injected client (tests/override) is always used
+            return self._client
+        if model is not None and model != self.model:
+            return self._build_chat(model)
         if self._client is None:
-            try:
-                from langchain_groq import ChatGroq  # pylint: disable=import-outside-toplevel
-            except ImportError as exc:
-                raise RuntimeError(
-                    "langchain-groq is not installed. Install it with "
-                    "`pip install langchain-groq` to use the Groq answer backend."
-                ) from exc
-            self._client = ChatGroq(
-                model=self.model,
-                api_key=self._api_key or None,  # type: ignore[arg-type]  # str coerced to SecretStr at runtime
-                temperature=0.0,
-                max_tokens=_MAX_TOKENS,
-            )
+            self._client = self._build_chat(self.model)
         return self._client
 
     @staticmethod
@@ -156,18 +182,23 @@ class GroqClient:
         """
         from langchain_core.messages import HumanMessage, SystemMessage  # pylint: disable=import-outside-toplevel
 
+        # A screenshot needs a vision model; the default text model can't see images.
+        active_model = self.model
+        if image_b64 and not self._is_vision_model(self.model):
+            active_model = VISION_GROQ_MODEL
+
         messages = [
             SystemMessage(content=self.build_system_prompt(mode)),
             HumanMessage(content=self._build_user_content(question, image_b64, context)),
         ]
         logger.info(
             "Streaming Groq answer (model=%s, mode=%s, image=%s, context=%s)",
-            self.model,
+            active_model,
             mode.value,
             image_b64 is not None,
             context is not None,
         )
-        for chunk in self._model_client().stream(messages):
+        for chunk in self._model_client(active_model).stream(messages):
             yield from self._chunk_text(chunk.content)
 
     @staticmethod
