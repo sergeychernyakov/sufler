@@ -84,6 +84,9 @@ line under `[Unreleased]`**.
   and `SUFLER_STT_MAX_UTTERANCE`. _feat(audio)_
 
 ### Fixed
+- **Answer links for term-less answers** — the answer now links Latin/English technical terms even
+  when the model returns no `**bold**`/`` `code` `` markers (some models, e.g. gpt-oss, do), so the
+  answer isn't left without any clickable terms. _fix(ui)_
 - **Dropped punctuation in the recognition feed** — leading punctuation (opening quotes, brackets,
   dashes) around a word was stripped and not re-added when linkifying; now both leading and trailing
   punctuation are preserved. _fix(ui)_
