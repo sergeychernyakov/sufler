@@ -690,6 +690,25 @@ def test_tags_render_as_chip_buttons(overlay: Overlay) -> None:
     assert {"REST", "thread"} <= labels
 
 
+def test_hiding_transcript_collapses_bottom_pane_so_tags_drop_down(overlay: Overlay, qtbot) -> None:
+    """Hiding the recognition feed collapses its pane so tags fall to the bottom."""
+    overlay.resize(400, 600)
+    overlay.show()
+    qtbot.waitExposed(overlay)
+    overlay.add_tags(["REST"])
+
+    overlay.set_transcript_visible(True)
+    qtbot.waitUntil(lambda: overlay._transcript.isVisible(), timeout=1000)
+    shown_bottom = overlay._body_splitter.sizes()[1]
+
+    overlay.set_transcript_visible(False)
+    hidden_bottom = overlay._body_splitter.sizes()[1]
+
+    # The bottom pane (tags + now-hidden transcript) shrinks toward the tags' height.
+    assert hidden_bottom < shown_bottom
+    assert overlay._transcript.isVisible() is False
+
+
 def test_tag_chips_are_displayed_alphabetically(overlay: Overlay) -> None:
     """Chips render in case-insensitive alphabetical order regardless of insertion order."""
     overlay.add_tags(["thread", "Active Record", "mutex"])
