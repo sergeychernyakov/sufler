@@ -48,7 +48,8 @@ line under `[Unreleased]`**.
   now move through every previous hint and drill-down (browser-style). _feat(controller)_
 - **Tag cloud** — clickable pill chips of terms collected from answers, shown **above the
   recognition area**, **sorted alphabetically** and fully visible (wrap, no scroll), up to 20
-  unique; clicking one drills down like an inline term link. _feat(ui)_
+  unique; clicking one drills down like an inline term link. When the recognition feed is hidden,
+  the tags drop to the bottom (above the controls) instead of floating in the middle. _feat(ui)_
 - **Pin (📌)** — freeze the current answer: sufler keeps recognizing and answering in the
   background, and the new answers queue into forward history (reachable with →). _feat(ui)_
 - **In-window model selector** — a dropdown switches the answer model on the fly (the active

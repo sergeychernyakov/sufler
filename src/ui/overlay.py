@@ -1113,10 +1113,20 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._transcript.clear()
 
     def set_transcript_visible(self, visible: bool) -> None:
-        """Shows or hides the live transcript (the recognition feed)."""
+        """Shows or hides the live transcript (the recognition feed).
+
+        When shown, the tag cloud sits above the transcript. When hidden, the bottom
+        splitter pane collapses to the tags' height so they drop to the bottom (just
+        above the controls) instead of floating in the middle.
+        """
         self._transcript.setVisible(visible)
         if self._transcript_toggle.isChecked() != visible:
             self._transcript_toggle.setChecked(visible)
+        if visible:
+            self._body_splitter.setSizes([260, 160])
+        else:
+            # Give the answer all the space; the bottom pane shrinks to the tags row.
+            self._body_splitter.setSizes([100000, 1])
 
     def is_transcript_visible(self) -> bool:
         """Returns whether the live transcript is currently visible.
