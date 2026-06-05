@@ -88,6 +88,31 @@ def test_engine_error_is_swallowed() -> None:
     assert finals == []
 
 
+def test_overlapping_transcription_is_dropped() -> None:
+    # A second utterance that arrives while the engine is busy must be dropped, never
+    # transcribed concurrently (MLX/Metal is not thread-safe -> segfault).
+    pipeline, capture, engine, _, finals = _make(text="привет")
+
+    reentered: list[bool] = []
+
+    def busy_transcribe(_audio_arg, _sr):
+        # Simulate work in progress: try to run a second final from inside the first.
+        got_lock = pipeline._transcribe_lock.acquire(blocking=False)  # noqa: SLF001
+        reentered.append(got_lock)
+        if got_lock:
+            pipeline._transcribe_lock.release()  # noqa: SLF001
+        from src.audio.stt import Transcript
+
+        return Transcript(text="привет", language="ru")
+
+    engine.transcribe.side_effect = busy_transcribe
+    capture.on_final(_audio())
+
+    # While _transcribe holds the lock, a re-entrant acquire must fail (lock held).
+    assert reentered == [False]
+    assert finals == ["привет"]
+
+
 def test_start_stop_delegate_to_capture() -> None:
     pipeline, capture, _, _, _ = _make()
     pipeline.start()
