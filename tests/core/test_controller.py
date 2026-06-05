@@ -6,7 +6,7 @@ import pytest
 
 from src.config import config
 from src.core.context import RollingContext
-from src.core.controller import CAPTURE_PROMPT, Controller, _looks_like_question
+from src.core.controller import CAPTURE_PROMPT, Controller, _extract_terms_from_speech, _looks_like_question
 from src.models.enums import Mode
 
 
@@ -17,6 +17,7 @@ class _FakeOverlay:
         self.questions: list[str] = []
         self.answer_tokens: list[str] = []
         self.transcript: list[str] = []
+        self.tags_added: list[str] = []
         self.levels: list[float] = []
         self.shown_answers: list[str] = []
         self.back_visible = False
@@ -43,6 +44,9 @@ class _FakeOverlay:
 
     def append_transcript(self, text: str) -> None:
         self.transcript.append(text)
+
+    def add_tags(self, terms) -> None:
+        self.tags_added.extend(terms)
 
     def set_input_level(self, level: float) -> None:
         self.levels.append(level)
@@ -138,6 +142,19 @@ def test_single_word_becomes_definition_question(monkeypatch: pytest.MonkeyPatch
     controller.on_submit_text("REST")
     assert claude.calls[-1]["question"] == "Что такое REST?"
     assert overlay.questions[-1] == "Что такое REST?"
+
+
+def test_extract_terms_from_speech_picks_latin_tokens() -> None:
+    assert _extract_terms_from_speech("расскажи про REST и thread в Python") == ["REST", "thread", "Python"]
+    assert _extract_terms_from_speech("обычная русская речь без терминов") == []
+    assert _extract_terms_from_speech("REST rest REST") == ["REST"]  # case-insensitive dedup
+
+
+def test_final_speech_fills_tags_from_speech_terms() -> None:
+    controller, overlay, _, _ = _make()
+    controller.final_speech.emit("это про deadlock и mutex")
+    assert "deadlock" in overlay.tags_added
+    assert "mutex" in overlay.tags_added
 
 
 def test_multiword_input_is_left_as_is() -> None:

@@ -738,6 +738,24 @@ def test_tag_chip_click_emits_term_activated(overlay: Overlay, qtbot) -> None:
     assert blocker.args == ["REST"]
 
 
+def test_transcript_words_are_clickable_links() -> None:
+    """Every word in a transcript line becomes a clickable ``term:`` link."""
+    html_line = Overlay._linkify_words("расскажи про REST, пожалуйста")
+    assert html_line.count('href="term:') == 4  # расскажи, про, REST, пожалуйста
+    assert "пожалуйста" in html_line
+    assert "," in html_line  # punctuation preserved
+
+
+def test_transcript_anchor_click_emits_term_activated(overlay: Overlay, qtbot) -> None:
+    """Clicking a word in the transcript drills down via ``term_activated``."""
+    from PyQt6.QtCore import QUrl
+
+    overlay.append_transcript("что такое mutex")
+    with qtbot.waitSignal(overlay.term_activated, timeout=1000) as blocker:
+        overlay._transcript.anchorClicked.emit(QUrl("term:mutex"))
+    assert blocker.args == ["mutex"]
+
+
 def test_pin_button_toggles_and_emits(overlay: Overlay, qtbot) -> None:
     """The pin button is off by default, emits ``pin_toggled`` and reflects set_pinned."""
     assert overlay.is_pinned() is False
