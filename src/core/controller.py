@@ -11,6 +11,7 @@ so the UI is updated on the main thread and never blocks.
 
 from __future__ import annotations
 
+import re
 import threading
 import time
 from typing import Callable, Optional, Protocol
@@ -102,6 +103,29 @@ def _looks_like_question(text: str) -> bool:
         return True
     first = stripped.lower().lstrip("«\"'(-—. ").split(maxsplit=1)[:1]
     return bool(first) and first[0].strip(".,!:;") in _QUESTION_WORDS
+
+
+def _extract_terms_from_speech(text: str) -> list[str]:
+    """Heuristically extracts technical terms from recognized speech for the tag cloud.
+
+    No LLM: picks out Latin-script tokens (≥3 chars) — in Russian interview speech these
+    are the technical terms (``REST``, ``deadlock``, ``thread``, ``GIL`` …). Returns them
+    in order of first appearance; the tag cloud de-duplicates and caps the list.
+
+    Args:
+        text (str): The recognized utterance.
+
+    Returns:
+        list[str]: Candidate terms, in order of appearance.
+    """
+    seen: set[str] = set()
+    terms: list[str] = []
+    for match in re.findall(r"[A-Za-z][A-Za-z0-9+#.\-]{2,}", text):
+        key = match.lower()
+        if key not in seen:
+            seen.add(key)
+            terms.append(match)
+    return terms
 
 
 Runner = Callable[[Callable[[], None]], None]
@@ -354,8 +378,13 @@ class Controller(QObject):
         self._context.add_speech(text)
         self._context.set_question(text)
         self._overlay.append_transcript(text)  # recognition feed keeps flowing even when pinned
+        # Task 1 (always, no LLM): surface technical terms from speech into the tag cloud.
+        terms = _extract_terms_from_speech(text)
+        if terms:
+            self._overlay.add_tags(terms)
         if not self._pinned:
             self._overlay.set_question(text)
+        # Task 2: answer actual questions (LLM, gated by the question filter + cooldown).
         if self._should_auto_answer(text):
             self._last_auto_answer = time.monotonic()
             if self._pinned:

@@ -63,6 +63,13 @@ line under `[Unreleased]`**.
 - **Longer answers** — up to **7** points/theses by default (was ~3); configurable via
   `SUFLER_ANSWER_POINTS`. _feat(controller)_
 
+### Added
+- **Two parallel passes over recognized speech** — (1) technical terms are extracted heuristically
+  from every utterance (no LLM, Latin-script tokens like `REST`/`deadlock`) and added to the tag
+  cloud; (2) questions are detected and answered as before. _feat(controller)_
+- **Clickable words in the recognition feed** — every word in the live transcript is now a link;
+  clicking it asks the LLM for a definition, exactly like a tag chip. _feat(ui)_
+
 ### Fixed
 - **Crash (SIGSEGV) under heavy speech** — overlapping utterances spawned concurrent MLX Whisper
   transcriptions, and MLX/Metal is not thread-safe, so two simultaneous `eval` calls segfaulted the

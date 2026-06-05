@@ -455,9 +455,11 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._send_button.setToolTip("Отправить (Enter)")
         self._send_button.setCursor(Qt.CursorShape.PointingHandCursor)
 
-        self._transcript = QtWidgets.QTextEdit(self)
+        # QTextBrowser (not QTextEdit) so each recognized word can be a clickable link.
+        self._transcript = QtWidgets.QTextBrowser(self)
         self._transcript.setObjectName("transcript")
-        self._transcript.setReadOnly(True)
+        self._transcript.setOpenLinks(False)
+        self._transcript.setOpenExternalLinks(False)
         self._transcript.setPlaceholderText("Распознанная речь появится здесь…")
         self._transcript.setMinimumHeight(48)
 
@@ -563,6 +565,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._model_combo.textActivated.connect(self.model_changed)
         self._lang_combo.textActivated.connect(self.language_changed)
         self._answer_label.linkActivated.connect(self._on_answer_link)
+        self._transcript.anchorClicked.connect(lambda url: self._on_answer_link(url.toString()))
         self._pin_button.clicked.connect(self.pin_toggled)
         self._capture_button.clicked.connect(self._on_capture_clicked)
         self._mic_button.clicked.connect(self._on_mic_clicked)
@@ -1093,14 +1096,35 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
     # Live transcript (recognized speech feed)
     # ------------------------------------------------------------------ #
     def append_transcript(self, text: str) -> None:
-        """Appends a finalized recognized utterance to the live transcript.
+        """Appends a recognized utterance with every word as a clickable term link.
 
         Args:
             text (str): The recognized text to append (blank text is ignored).
         """
         text = text.strip()
         if text:
-            self._transcript.append(text)  # new paragraph + auto-scroll
+            self._transcript.append(self._linkify_words(text))  # new paragraph + auto-scroll
+
+    @staticmethod
+    def _linkify_words(text: str) -> str:
+        """Wraps every word in ``text`` as a ``term:`` link (punctuation left as-is).
+
+        Args:
+            text (str): Plain recognized text.
+
+        Returns:
+            str: HTML where each word (≥2 letters, Latin or Cyrillic) is a clickable link.
+        """
+        out: list[str] = []
+        for token in re.findall(r"[^\W\d_]{2,}|.", text, flags=re.UNICODE):
+            if len(token) >= 2 and token[0].isalpha():
+                out.append(
+                    f'<a href="term:{quote(token)}" style="color:#cfe8ff; text-decoration:none;">'
+                    f"{html.escape(token)}</a>"
+                )
+            else:
+                out.append(html.escape(token))
+        return "".join(out)
 
     def clear_transcript(self) -> None:
         """Clears the live transcript area."""
