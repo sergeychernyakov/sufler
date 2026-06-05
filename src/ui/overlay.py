@@ -516,16 +516,27 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         nav_row.addWidget(self._forward_button)
         layout.addLayout(nav_row)
 
-        # The answer area always absorbs slack (stretch=1), which pins the tag cloud and
-        # the recognition feed to the bottom: tags sit ABOVE the transcript when it is
-        # shown, and drop to just above the controls when it is hidden.
+        # A draggable splitter: top pane = [answer (stretch) + tag cloud], bottom pane =
+        # the transcript. The handle is the transcript's top border (drag to resize). The
+        # answer's stretch keeps the tags pinned just above the handle, so they sit above
+        # the transcript when shown and drop to the bottom when it is hidden.
         self._answer_scroll.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding
         )
-        self._transcript.setMaximumHeight(180)
-        layout.addWidget(self._answer_scroll, stretch=1)
-        layout.addWidget(self._tags_container)
-        layout.addWidget(self._transcript)
+        top_pane = QtWidgets.QWidget(self)
+        top_layout = QtWidgets.QVBoxLayout(top_pane)
+        top_layout.setContentsMargins(0, 0, 0, 0)
+        top_layout.setSpacing(6)
+        top_layout.addWidget(self._answer_scroll, stretch=1)
+        top_layout.addWidget(self._tags_container)
+
+        self._body_splitter = QtWidgets.QSplitter(Qt.Orientation.Vertical, self)
+        self._body_splitter.addWidget(top_pane)
+        self._body_splitter.addWidget(self._transcript)
+        self._body_splitter.setStretchFactor(0, 3)
+        self._body_splitter.setStretchFactor(1, 1)
+        self._body_splitter.setSizes([320, 160])
+        layout.addWidget(self._body_splitter, stretch=1)
 
         controls = QtWidgets.QHBoxLayout()
         controls.setSpacing(6)
@@ -1107,23 +1118,36 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
 
     @staticmethod
     def _linkify_words(text: str) -> str:
-        """Wraps every word in ``text`` as a ``term:`` link (punctuation left as-is).
+        """Renders recognized text with clickable words + a per-sentence "·" lookup dot.
+
+        Every word (≥2 letters) is a ``term:`` link (single-word lookup); after each
+        sentence a clickable ``·`` is inserted whose link is the whole sentence, so a
+        full phrase/sentence can be sent without selecting text.
 
         Args:
             text (str): Plain recognized text.
 
         Returns:
-            str: HTML where each word (≥2 letters, Latin or Cyrillic) is a clickable link.
+            str: HTML with per-word links and per-sentence dots.
         """
         out: list[str] = []
-        for token in re.findall(r"[^\W\d_]{2,}|.", text, flags=re.UNICODE):
-            if len(token) >= 2 and token[0].isalpha():
-                out.append(
-                    f'<a href="term:{quote(token)}" style="color:#cfe8ff; text-decoration:none;">'
-                    f"{html.escape(token)}</a>"
-                )
-            else:
-                out.append(html.escape(token))
+        for sentence in re.split(r"(?<=[.!?])\s+", text.strip()):
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+            for token in re.findall(r"[^\W\d_]{2,}|.", sentence, flags=re.UNICODE):
+                if len(token) >= 2 and token[0].isalpha():
+                    out.append(
+                        f'<a href="term:{quote(token)}" style="color:#cfe8ff; text-decoration:none;">'
+                        f"{html.escape(token)}</a>"
+                    )
+                else:
+                    out.append(html.escape(token))
+            # Clickable dot → look up the whole sentence (phrase lookup, no selection).
+            out.append(
+                f' <a href="term:{quote(sentence)}" title="Спросить про всё предложение" '
+                f'style="color:#ffcf5b; text-decoration:none; font-weight:bold;">·</a> '
+            )
         return "".join(out)
 
     def clear_transcript(self) -> None:
@@ -1139,6 +1163,10 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._transcript.setVisible(visible)
         if self._transcript_toggle.isChecked() != visible:
             self._transcript_toggle.setChecked(visible)
+        if visible:
+            self._body_splitter.setSizes([320, 160])
+        else:
+            self._body_splitter.setSizes([100000, 0])  # collapse the transcript pane
 
     def is_transcript_visible(self) -> bool:
         """Returns whether the live transcript is currently visible.

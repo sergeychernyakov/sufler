@@ -41,11 +41,11 @@ AVAILABLE_MODELS: dict[str, tuple[str, ...]] = {
     "claude": ("claude-sonnet-4-6", "claude-opus-4-8", "claude-haiku-4-5"),
     "gemini": ("gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"),
     "groq": (
-        "meta-llama/llama-4-scout-17b-16e-instruct",
-        "llama-3.3-70b-versatile",
-        "llama-3.1-8b-instant",
-        "qwen/qwen3-32b",
         "openai/gpt-oss-120b",
+        "llama-3.3-70b-versatile",
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "qwen/qwen3-32b",
+        "llama-3.1-8b-instant",
     ),
 }
 

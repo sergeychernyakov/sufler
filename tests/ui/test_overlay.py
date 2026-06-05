@@ -739,11 +739,21 @@ def test_tag_chip_click_emits_term_activated(overlay: Overlay, qtbot) -> None:
 
 
 def test_transcript_words_are_clickable_links() -> None:
-    """Every word in a transcript line becomes a clickable ``term:`` link."""
+    """Every word is a clickable link, plus one whole-sentence dot per sentence."""
     html_line = Overlay._linkify_words("расскажи про REST, пожалуйста")
-    assert html_line.count('href="term:') == 4  # расскажи, про, REST, пожалуйста
+    # 4 word links + 1 sentence-dot link.
+    assert html_line.count('href="term:') == 5
     assert "пожалуйста" in html_line
+    assert "·" in html_line  # whole-sentence lookup dot
     assert "," in html_line  # punctuation preserved
+
+
+def test_transcript_sentence_dot_links_whole_sentence() -> None:
+    """The per-sentence dot's link carries the full sentence text."""
+    from urllib.parse import quote
+
+    html_line = Overlay._linkify_words("Что такое REST?")
+    assert f'href="term:{quote("Что такое REST?")}"' in html_line
 
 
 def test_transcript_anchor_click_emits_term_activated(overlay: Overlay, qtbot) -> None:
