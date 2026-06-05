@@ -758,6 +758,15 @@ def test_transcript_sentence_dot_links_whole_sentence() -> None:
     assert f'href="term:{quote("Что такое REST?")}"' in html_line
 
 
+def test_clear_button_empties_the_transcript(overlay: Overlay) -> None:
+    """The 'Очистить' button clears the recognition feed."""
+    overlay.append_transcript("первая фраза")
+    overlay.append_transcript("вторая фраза")
+    assert overlay._transcript.toPlainText() != ""
+    overlay._clear_transcript_button.click()
+    assert overlay._transcript.toPlainText() == ""
+
+
 def test_transcript_preserves_leading_and_trailing_punctuation() -> None:
     """Punctuation around a word (quotes, brackets, commas) is kept, not dropped."""
     html_line = Overlay._linkify_words("он сказал «привет», (REST)")

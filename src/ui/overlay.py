@@ -469,6 +469,11 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._transcript_toggle.setObjectName("transcriptToggle")
         self._transcript_toggle.setChecked(True)
 
+        self._clear_transcript_button = QtWidgets.QPushButton("Очистить", self)
+        self._clear_transcript_button.setObjectName("clearTranscriptButton")
+        self._clear_transcript_button.setToolTip("Очистить распознанный текст")
+        self._clear_transcript_button.setCursor(Qt.CursorShape.PointingHandCursor)
+
         # Microphone input-volume slider + live level meter (no trip to System Settings).
         self._volume_label = QtWidgets.QLabel("Громкость", self)
         self._volume_label.setObjectName("controlLabel")
@@ -568,7 +573,11 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         level_row.addWidget(self._level_meter, stretch=1)
         layout.addLayout(level_row)
 
-        layout.addWidget(self._transcript_toggle)
+        transcript_row = QtWidgets.QHBoxLayout()
+        transcript_row.setSpacing(6)
+        transcript_row.addWidget(self._transcript_toggle, stretch=1)
+        transcript_row.addWidget(self._clear_transcript_button)
+        layout.addLayout(transcript_row)
 
     def _connect_signals(self) -> None:
         """Wires child-widget signals to the overlay's public signals."""
@@ -588,6 +597,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._input_field.returnPressed.connect(self._on_input_submitted)
         self._send_button.clicked.connect(self._on_input_submitted)
         self._transcript_toggle.toggled.connect(self.set_transcript_visible)
+        self._clear_transcript_button.clicked.connect(self.clear_transcript)
         self._volume_slider.valueChanged.connect(self._on_volume_changed)
 
     def _build_shortcuts(self) -> None:
@@ -730,6 +740,17 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
             QCheckBox#transcriptToggle {
                 color: #b8b8c0;
                 font-size: 11px;
+            }
+            QPushButton#clearTranscriptButton {
+                background-color: rgba(60, 60, 70, 230);
+                border: 1px solid rgba(120, 120, 140, 200);
+                border-radius: 6px;
+                padding: 2px 10px;
+                color: #d8d8de;
+                font-size: 11px;
+            }
+            QPushButton#clearTranscriptButton:hover {
+                background-color: rgba(80, 80, 92, 240);
             }
             QLabel#controlLabel {
                 color: #b8b8c0;
