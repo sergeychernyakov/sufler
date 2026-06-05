@@ -739,21 +739,28 @@ def test_tag_chip_click_emits_term_activated(overlay: Overlay, qtbot) -> None:
 
 
 def test_transcript_words_are_clickable_links() -> None:
-    """Every word is a clickable link, plus one whole-sentence dot per sentence."""
-    html_line = Overlay._linkify_words("расскажи про REST, пожалуйста")
-    # 4 word links + 1 sentence-dot link.
-    assert html_line.count('href="term:') == 5
-    assert "пожалуйста" in html_line
-    assert "·" in html_line  # whole-sentence lookup dot
-    assert "," in html_line  # punctuation preserved
-
-
-def test_transcript_sentence_dot_links_whole_sentence() -> None:
-    """The per-sentence dot's link carries the full sentence text."""
+    """Every word is a clickable link; a "·" between words looks up the pair."""
     from urllib.parse import quote
 
-    html_line = Overlay._linkify_words("Что такое REST?")
-    assert f'href="term:{quote("Что такое REST?")}"' in html_line
+    html_line = Overlay._linkify_words("расскажи про REST")
+    # 3 word links + 2 between-word pair dots.
+    assert html_line.count('href="term:') == 5
+    assert "·" in html_line
+    # The dot between the first two words carries the two-word phrase.
+    assert f'href="term:{quote("расскажи про")}"' in html_line
+
+
+def test_selection_fills_input_field(overlay: Overlay) -> None:
+    """A non-empty selection is normalized and dropped into the manual-input field."""
+    overlay._selection_to_input("два  слова\nтретье")
+    assert overlay._input_field.text() == "два слова третье"
+
+
+def test_empty_selection_does_not_overwrite_input(overlay: Overlay) -> None:
+    """An empty/whitespace selection leaves the input field untouched."""
+    overlay._input_field.setText("моё")
+    overlay._selection_to_input("   ")
+    assert overlay._input_field.text() == "моё"
 
 
 def test_transcript_anchor_click_emits_term_activated(overlay: Overlay, qtbot) -> None:
