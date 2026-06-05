@@ -18,6 +18,7 @@ import numpy as np
 
 from src.audio.capture import MicrophoneCapture
 from src.audio.stt import STTEngine
+from src.config import config
 from src.helpers.logger import get_logger
 
 logger = get_logger(__name__)
@@ -73,6 +74,8 @@ class SpeechPipeline:
             on_level=on_level,
             sample_rate=sample_rate,
             device=device,
+            silence_seconds=config.stt_silence_seconds,
+            max_utterance_seconds=config.stt_max_utterance_seconds,
         )
 
     def start(self) -> None:

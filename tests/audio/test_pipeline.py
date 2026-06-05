@@ -13,12 +13,24 @@ from src.audio.stt import Transcript
 class _FakeCapture:
     """Records the handlers the pipeline wires in and start/stop calls."""
 
-    def __init__(self, *, on_partial, on_final, on_level=None, sample_rate=16000, device=None) -> None:
+    def __init__(
+        self,
+        *,
+        on_partial,
+        on_final,
+        on_level=None,
+        sample_rate=16000,
+        device=None,
+        silence_seconds=0.45,
+        max_utterance_seconds=5.0,
+    ) -> None:
         self.on_partial = on_partial
         self.on_final = on_final
         self.on_level = on_level
         self.sample_rate = sample_rate
         self.device = device
+        self.silence_seconds = silence_seconds
+        self.max_utterance_seconds = max_utterance_seconds
         self.started = 0
         self.stopped = 0
 
@@ -154,6 +166,28 @@ def test_on_level_is_forwarded_to_capture() -> None:
     )
 
     assert captures["capture"].on_level is not None
+
+
+def test_capture_timing_comes_from_config(monkeypatch) -> None:
+    import src.audio.pipeline as pipeline_mod
+
+    monkeypatch.setattr(pipeline_mod.config, "stt_silence_seconds", 0.3)
+    monkeypatch.setattr(pipeline_mod.config, "stt_max_utterance_seconds", 4.0)
+    captures: dict[str, _FakeCapture] = {}
+
+    def factory(**kwargs):
+        captures["capture"] = _FakeCapture(**kwargs)
+        return captures["capture"]
+
+    SpeechPipeline(
+        MagicMock(),
+        on_partial_text=lambda s: None,
+        on_final_text=lambda s: None,
+        capture_factory=factory,
+        runner=lambda work: work(),
+    )
+    assert captures["capture"].silence_seconds == 0.3
+    assert captures["capture"].max_utterance_seconds == 4.0
 
 
 def test_device_is_forwarded_to_capture() -> None:

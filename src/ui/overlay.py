@@ -1206,27 +1206,38 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
                 f"&nbsp;{glyph}&nbsp;</a>"
             )
 
+        punct = ".,!?;:()[]{}«»\"'„“”‚‘’—–-…"
+
+        def split_token(token: str) -> tuple[str, str, str]:
+            """Splits a token into (leading punctuation, word core, trailing punctuation)."""
+            left = token.lstrip(punct)
+            lead = token[: len(token) - len(left)]
+            core = left.rstrip(punct)
+            trail = left[len(core) :]
+            return lead, core, trail
+
         out: list[str] = []
         for sentence in re.split(r"(?<=[.!?])\s+", text.strip()):
             sentence = sentence.strip()
             if not sentence:
                 continue
             parts = re.split(r"(\s+)", sentence)
-            cores = [(i, p.strip(".,!?;:()«»\"'")) for i, p in enumerate(parts) if p and not p.isspace()]
+            cores = [(i, split_token(p)[1]) for i, p in enumerate(parts) if p and not p.isspace()]
             for idx, part in enumerate(parts):
                 if part.isspace():
                     continue
-                core = part.strip(".,!?;:()«»\"'")
+                lead, core, trail = split_token(part)
+                if lead:
+                    out.append(html.escape(lead))  # keep leading punctuation (quotes, brackets…)
                 if len(core) >= 2 and core[0].isalpha():
                     out.append(word_link(core))
-                    tail = part[part.rfind(core) + len(core) :]
-                    if tail:
-                        out.append(html.escape(tail))
                 else:
-                    out.append(html.escape(part))
+                    out.append(html.escape(core))
+                if trail:
+                    out.append(html.escape(trail))  # keep trailing punctuation
                 # "·" between this word and the next → the two-word phrase.
                 nxt = next((c for c in cores if c[0] > idx), None)
-                this_core = core if (len(core) >= 2 and core[0].isalpha()) else part.strip()
+                this_core = core or part.strip()
                 if nxt is not None and this_core and nxt[1]:
                     pair = f"{this_core} {nxt[1]}"
                     out.append(dot(pair, "·", f"Два слова: {pair}"))

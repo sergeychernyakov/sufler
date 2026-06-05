@@ -66,6 +66,12 @@ class Config:
     # Comma-separated allowed STT languages; transcripts in other languages are discarded
     # (kills silence hallucinations that come out as random foreign text). Empty = allow all.
     stt_allowed_langs: str = field(default_factory=lambda: os.getenv("SUFLER_STT_ALLOWED_LANGS", "ru,en"))
+    # How the recognition feed updates: finalize after this much trailing silence (lower =
+    # the transcript updates more often), and force a finalize at this max utterance length.
+    stt_silence_seconds: float = field(default_factory=lambda: float(os.getenv("SUFLER_STT_SILENCE", "0.45") or "0.45"))
+    stt_max_utterance_seconds: float = field(
+        default_factory=lambda: float(os.getenv("SUFLER_STT_MAX_UTTERANCE", "5") or "5")
+    )
     loopback_device: str = field(default_factory=lambda: os.getenv("SUFLER_LOOPBACK_DEVICE", ""))
 
     # UI
