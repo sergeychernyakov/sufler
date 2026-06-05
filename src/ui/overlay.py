@@ -577,6 +577,8 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._lang_combo.textActivated.connect(self.language_changed)
         self._answer_label.linkActivated.connect(self._on_answer_link)
         self._transcript.anchorClicked.connect(lambda url: self._on_answer_link(url.toString()))
+        self._transcript.selectionChanged.connect(self._on_transcript_selection)
+        self._answer_label.installEventFilter(self)  # capture answer-text selection on release
         self._pin_button.clicked.connect(self.pin_toggled)
         self._capture_button.clicked.connect(self._on_capture_clicked)
         self._mic_button.clicked.connect(self._on_mic_clicked)
@@ -662,6 +664,8 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
             QLabel#answerLabel {
                 color: #f2f2f2;
                 font-size: 13px;
+                selection-background-color: #3b6ea5;
+                selection-color: #ffffff;
             }
             QPushButton#captureButton, QPushButton#sendButton, QPushButton#micButton,
             QPushButton#backButton, QPushButton#forwardButton, QPushButton#copyButton,
@@ -717,6 +721,8 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
                 border-radius: 6px;
                 color: #cfe8ff;
                 font-size: 12px;
+                selection-background-color: #3b6ea5;
+                selection-color: #ffffff;
             }
             QCheckBox#transcriptToggle {
                 color: #b8b8c0;
@@ -1010,6 +1016,27 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         if href.startswith("term:"):
             self.term_activated.emit(unquote(href[len("term:") :]))
 
+    def _on_transcript_selection(self) -> None:
+        """Puts the transcript's current selection into the manual-input field."""
+        self._selection_to_input(self._transcript.textCursor().selectedText())
+
+    def eventFilter(self, obj: QtCore.QObject | None, event: QtCore.QEvent | None) -> bool:  # noqa: N802  (Qt override)
+        """On mouse-release over the answer, copies its selection into the input field."""
+        if obj is self._answer_label and event is not None and event.type() == QtCore.QEvent.Type.MouseButtonRelease:
+            self._selection_to_input(self._answer_label.selectedText())
+        return super().eventFilter(obj, event)
+
+    def _selection_to_input(self, selected: str) -> None:
+        """Fills the manual-input field with a non-empty selection (for editing/sending).
+
+        Args:
+            selected (str): The selected text (Qt uses U+2029 for line breaks).
+        """
+        normalized = "".join(" " if ch in ("\u2029", "\u2028", "\n", "\r") else ch for ch in selected)
+        text = " ".join(normalized.split())
+        if text:
+            self._input_field.setText(text)
+
     @staticmethod
     def _extract_terms(raw: str) -> list[str]:
         """Returns the linkable terms (``**bold**`` and `` `code` ``) found in ``raw``, in order.
@@ -1118,36 +1145,51 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
 
     @staticmethod
     def _linkify_words(text: str) -> str:
-        """Renders recognized text with clickable words + a per-sentence "·" lookup dot.
+        """Renders recognized text: each word a link, with a "·" between words for pairs.
 
-        Every word (≥2 letters) is a ``term:`` link (single-word lookup); after each
-        sentence a clickable ``·`` is inserted whose link is the whole sentence, so a
-        full phrase/sentence can be sent without selecting text.
+        A single word click looks up that word; a click on the ``·`` between two words
+        looks up that **pair of words**. (For longer phrases, select the text — it drops
+        into the manual-input field.)
 
         Args:
             text (str): Plain recognized text.
 
         Returns:
-            str: HTML with per-word links and per-sentence dots.
+            str: HTML with per-word links and between-word pair dots.
         """
-        out: list[str] = []
-        for sentence in re.split(r"(?<=[.!?])\s+", text.strip()):
-            sentence = sentence.strip()
-            if not sentence:
-                continue
-            for token in re.findall(r"[^\W\d_]{2,}|.", sentence, flags=re.UNICODE):
-                if len(token) >= 2 and token[0].isalpha():
-                    out.append(
-                        f'<a href="term:{quote(token)}" style="color:#cfe8ff; text-decoration:none;">'
-                        f"{html.escape(token)}</a>"
-                    )
-                else:
-                    out.append(html.escape(token))
-            # Clickable dot → look up the whole sentence (phrase lookup, no selection).
-            out.append(
-                f' <a href="term:{quote(sentence)}" title="Спросить про всё предложение" '
-                f'style="color:#ffcf5b; text-decoration:none; font-weight:bold;">·</a> '
+
+        def word_link(word: str) -> str:
+            return (
+                f'<a href="term:{quote(word)}" style="color:#cfe8ff; text-decoration:none;">' f"{html.escape(word)}</a>"
             )
+
+        # Split into words and the separators between them, so we can place dots in gaps.
+        parts = re.split(r"(\s+)", text.strip())
+        words = [(i, p) for i, p in enumerate(parts) if p and not p.isspace()]
+        out: list[str] = []
+        for idx, part in enumerate(parts):
+            if part.isspace():
+                continue
+            # Is this token a real word (starts with a letter, ≥2 chars)?
+            core = part.strip(".,!?;:()«»\"'")
+            if len(core) >= 2 and core[0].isalpha():
+                out.append(word_link(core))
+                # Append any trailing punctuation that was on the token.
+                tail = part[part.rfind(core) + len(core) :]
+                if tail:
+                    out.append(html.escape(tail))
+            else:
+                out.append(html.escape(part))
+            # A "·" between this word and the next → looks up the two-word phrase.
+            nxt = next((w for w in words if w[0] > idx), None)
+            this_core = core if (len(core) >= 2 and core[0].isalpha()) else part.strip()
+            if nxt is not None and this_core:
+                next_core = nxt[1].strip(".,!?;:()«»\"'")
+                pair = f"{this_core} {next_core}".strip()
+                out.append(
+                    f' <a href="term:{quote(pair)}" title="Спросить про два слова: {html.escape(pair)}" '
+                    f'style="color:#ffcf5b; text-decoration:none; font-weight:bold;">·</a> '
+                )
         return "".join(out)
 
     def clear_transcript(self) -> None:

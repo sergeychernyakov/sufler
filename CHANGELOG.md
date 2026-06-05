@@ -67,8 +67,8 @@ line under `[Unreleased]`**.
 - **Smartest Groq model by default** — `openai/gpt-oss-120b` (free, strongest reasoning) is now the
   default answer model; screenshots automatically fall back to the vision model
   (`llama-4-scout`) for that request. _feat(llm)_
-- **Whole-sentence lookup dot** — each sentence in the recognition feed ends with a clickable `·`
-  that sends the full sentence to the LLM (phrase lookup without selecting text). _feat(ui)_
+- **Two-word lookup dot** — a clickable `·` between words looks up that pair of words; selecting
+  any text drops it into the manual-input field (then edit/Enter). Selection is shown highlighted. _feat(ui)_
 - **Two parallel passes over recognized speech** — (1) technical terms are extracted heuristically
   from every utterance (no LLM, Latin-script tokens like `REST`/`deadlock`) and added to the tag
   cloud; (2) questions are detected and answered as before. _feat(controller)_
