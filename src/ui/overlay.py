@@ -514,22 +514,16 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         nav_row.addWidget(self._forward_button)
         layout.addLayout(nav_row)
 
-        # Answer (top) and a bottom block of [tag cloud + transcript] share a draggable
-        # vertical splitter — drag the handle to resize. Tags sit ABOVE the recognition.
-        bottom = QtWidgets.QWidget(self)
-        bottom_layout = QtWidgets.QVBoxLayout(bottom)
-        bottom_layout.setContentsMargins(0, 0, 0, 0)
-        bottom_layout.setSpacing(6)
-        bottom_layout.addWidget(self._tags_container)
-        bottom_layout.addWidget(self._transcript, stretch=1)
-
-        self._body_splitter = QtWidgets.QSplitter(Qt.Orientation.Vertical, self)
-        self._body_splitter.addWidget(self._answer_scroll)
-        self._body_splitter.addWidget(bottom)
-        self._body_splitter.setStretchFactor(0, 3)
-        self._body_splitter.setStretchFactor(1, 1)
-        self._body_splitter.setSizes([260, 140])
-        layout.addWidget(self._body_splitter, stretch=1)
+        # The answer area always absorbs slack (stretch=1), which pins the tag cloud and
+        # the recognition feed to the bottom: tags sit ABOVE the transcript when it is
+        # shown, and drop to just above the controls when it is hidden.
+        self._answer_scroll.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding
+        )
+        self._transcript.setMaximumHeight(180)
+        layout.addWidget(self._answer_scroll, stretch=1)
+        layout.addWidget(self._tags_container)
+        layout.addWidget(self._transcript)
 
         controls = QtWidgets.QHBoxLayout()
         controls.setSpacing(6)
@@ -1115,18 +1109,12 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
     def set_transcript_visible(self, visible: bool) -> None:
         """Shows or hides the live transcript (the recognition feed).
 
-        When shown, the tag cloud sits above the transcript. When hidden, the bottom
-        splitter pane collapses to the tags' height so they drop to the bottom (just
-        above the controls) instead of floating in the middle.
+        The answer area's stretch keeps the tag cloud and transcript pinned to the
+        bottom, so hiding the transcript makes the tags drop to just above the controls.
         """
         self._transcript.setVisible(visible)
         if self._transcript_toggle.isChecked() != visible:
             self._transcript_toggle.setChecked(visible)
-        if visible:
-            self._body_splitter.setSizes([260, 160])
-        else:
-            # Give the answer all the space; the bottom pane shrinks to the tags row.
-            self._body_splitter.setSizes([100000, 1])
 
     def is_transcript_visible(self) -> bool:
         """Returns whether the live transcript is currently visible.

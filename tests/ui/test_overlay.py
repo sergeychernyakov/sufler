@@ -690,8 +690,8 @@ def test_tags_render_as_chip_buttons(overlay: Overlay) -> None:
     assert {"REST", "thread"} <= labels
 
 
-def test_hiding_transcript_collapses_bottom_pane_so_tags_drop_down(overlay: Overlay, qtbot) -> None:
-    """Hiding the recognition feed collapses its pane so tags fall to the bottom."""
+def test_hiding_transcript_drops_tags_to_the_bottom(overlay: Overlay, qtbot) -> None:
+    """The answer stretches so tags+transcript stay at the bottom; hiding drops tags lower."""
     overlay.resize(400, 600)
     overlay.show()
     qtbot.waitExposed(overlay)
@@ -699,13 +699,14 @@ def test_hiding_transcript_collapses_bottom_pane_so_tags_drop_down(overlay: Over
 
     overlay.set_transcript_visible(True)
     qtbot.waitUntil(lambda: overlay._transcript.isVisible(), timeout=1000)
-    shown_bottom = overlay._body_splitter.sizes()[1]
+    tags_y_shown = overlay._tags_container.mapTo(overlay, overlay._tags_container.rect().topLeft()).y()
 
     overlay.set_transcript_visible(False)
-    hidden_bottom = overlay._body_splitter.sizes()[1]
+    qtbot.waitUntil(lambda: not overlay._transcript.isVisible(), timeout=1000)
+    tags_y_hidden = overlay._tags_container.mapTo(overlay, overlay._tags_container.rect().topLeft()).y()
 
-    # The bottom pane (tags + now-hidden transcript) shrinks toward the tags' height.
-    assert hidden_bottom < shown_bottom
+    # With the transcript hidden, the tag cloud moves further down (toward the controls).
+    assert tags_y_hidden >= tags_y_shown
     assert overlay._transcript.isVisible() is False
 
 
