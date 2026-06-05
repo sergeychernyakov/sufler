@@ -64,6 +64,9 @@ class SpeechPipeline:
         self._sample_rate = sample_rate
         self._runner: Runner = runner or self._spawn_thread
         self._listening = False
+        #: Serializes transcription — MLX/Metal is NOT thread-safe; concurrent
+        #: ``transcribe`` calls segfault. Overlapping utterances are dropped, not queued.
+        self._transcribe_lock = threading.Lock()
         self._capture = capture_factory(
             on_partial=self._handle_partial_audio,
             on_final=self._handle_final_audio,
@@ -121,12 +124,22 @@ class SpeechPipeline:
         self._runner(lambda: self._transcribe(audio, self._on_final_text))
 
     def _transcribe(self, audio: np.ndarray, sink: TextSink) -> None:
-        """Runs the engine and forwards non-empty text, swallowing engine errors."""
+        """Runs the engine (serialized) and forwards non-empty text, swallowing errors.
+
+        MLX/Metal is not thread-safe, so a non-blocking lock guarantees only one
+        transcription runs at a time; an utterance that arrives while the engine is
+        busy is dropped rather than transcribed concurrently (which segfaults).
+        """
+        if not self._transcribe_lock.acquire(blocking=False):
+            logger.debug("Dropping overlapping utterance (engine busy)")
+            return
         try:
             transcript = self._engine.transcribe(audio, self._sample_rate)
         except Exception:  # noqa: BLE001  # pylint: disable=broad-exception-caught
             logger.exception("Transcription failed")
             return
+        finally:
+            self._transcribe_lock.release()
         text = transcript.text.strip()
         if text:
             sink(text)

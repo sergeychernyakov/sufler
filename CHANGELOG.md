@@ -63,6 +63,10 @@ line under `[Unreleased]`**.
   `SUFLER_ANSWER_POINTS`. _feat(controller)_
 
 ### Fixed
+- **Crash (SIGSEGV) under heavy speech** — overlapping utterances spawned concurrent MLX Whisper
+  transcriptions, and MLX/Metal is not thread-safe, so two simultaneous `eval` calls segfaulted the
+  app shortly after launch. Transcription is now serialized (one at a time); an utterance arriving
+  while the engine is busy is dropped instead of run concurrently. _fix(audio)_
 - **Weak-microphone recognition** — the speech-detection RMS gate is now configurable
   (`SUFLER_MIN_SPEECH_RMS`, default lowered `0.008` → `0.004`), so quiet mic input is no longer
   silently skipped. _fix(audio)_
