@@ -483,14 +483,13 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._tags: list[str] = []
         self._tags_container = QtWidgets.QWidget(self)
         self._tags_flow = _FlowLayout(self._tags_container, spacing=4)
-        self._tags_scroll = QtWidgets.QScrollArea(self)
-        self._tags_scroll.setObjectName("tagsScroll")
-        self._tags_scroll.setWidget(self._tags_container)
-        self._tags_scroll.setWidgetResizable(True)
-        self._tags_scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
-        self._tags_scroll.setMaximumHeight(60)
-        self._tags_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._tags_scroll.hide()  # shown once the first tags arrive
+        # Grow to fit all chips (wrap to new rows) — no scrollbar.
+        tags_policy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Minimum
+        )
+        tags_policy.setHeightForWidth(True)
+        self._tags_container.setSizePolicy(tags_policy)
+        self._tags_container.hide()  # shown once the first tags arrive
 
         # Pin: freeze the current answer while sufler keeps answering in the background.
         self._pin_button = QtWidgets.QPushButton("📌", self)
@@ -521,7 +520,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         bottom_layout = QtWidgets.QVBoxLayout(bottom)
         bottom_layout.setContentsMargins(0, 0, 0, 0)
         bottom_layout.setSpacing(6)
-        bottom_layout.addWidget(self._tags_scroll)
+        bottom_layout.addWidget(self._tags_container)
         bottom_layout.addWidget(self._transcript, stretch=1)
 
         self._body_splitter = QtWidgets.QSplitter(Qt.Orientation.Vertical, self)
@@ -1052,15 +1051,16 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
             if widget is not None:
                 widget.deleteLater()
         if not self._tags:
-            self._tags_scroll.hide()
+            self._tags_container.hide()
             return
-        for tag in self._tags:
+        for tag in sorted(self._tags, key=str.lower):  # displayed alphabetically
             chip = QtWidgets.QPushButton(tag, self._tags_container)
             chip.setObjectName("tagChip")
             chip.setCursor(Qt.CursorShape.PointingHandCursor)
             chip.clicked.connect(lambda _checked=False, t=tag: self.term_activated.emit(t))
             self._tags_flow.addWidget(chip)
-        self._tags_scroll.show()
+        self._tags_container.show()
+        self._tags_container.adjustSize()
 
     # ------------------------------------------------------------------ #
     # Pin (freeze the current answer)

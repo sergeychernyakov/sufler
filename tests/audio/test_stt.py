@@ -425,6 +425,39 @@ def test_mlx_transcribe_discards_english_silence_filler(fake_mlx: _FakeMlxWhispe
     assert engine.transcribe(_fake_audio()).text == ""
 
 
+def test_mlx_transcribe_discards_disallowed_language(
+    fake_mlx: _FakeMlxWhisper, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A transcript in a language outside the allowlist (e.g. nl) is discarded."""
+    # Arrange
+    monkeypatch.setattr(stt.config, "stt_allowed_langs", "ru,en")
+    fake_mlx._result = {"text": "welk een driet", "language": "nl"}  # pylint: disable=protected-access
+    engine = MlxWhisperEngine()
+
+    # Act / Assert
+    assert engine.transcribe(_fake_audio()).text == ""
+
+
+def test_mlx_transcribe_keeps_allowed_language(fake_mlx: _FakeMlxWhisper, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A transcript in an allowed language passes the language filter."""
+    # Arrange
+    monkeypatch.setattr(stt.config, "stt_allowed_langs", "ru,en")
+    fake_mlx._result = {"text": "привет мир", "language": "ru"}  # pylint: disable=protected-access
+    engine = MlxWhisperEngine()
+
+    # Act / Assert
+    assert engine.transcribe(_fake_audio()).text == "привет мир"
+
+
+def test_is_degenerate_catches_repeated_sentences() -> None:
+    """A looped short phrase (silence hallucination) is flagged as degenerate."""
+    from src.audio.stt import _is_degenerate  # pylint: disable=import-outside-toplevel
+
+    assert _is_degenerate("Thank you. Thank you. Thank you.") is True
+    assert _is_degenerate("Are you injured? Thank you. Thank you. Thank you.") is True
+    assert _is_degenerate("Что такое REST? Это архитектурный стиль.") is False
+
+
 def test_quiet_clip_below_rms_gate_is_skipped(fake_mlx: _FakeMlxWhisper, monkeypatch: pytest.MonkeyPatch) -> None:
     """A clip with RMS below ``config.min_speech_rms`` is skipped before the model runs."""
     # Arrange: a near-silent clip and a high gate.

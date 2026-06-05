@@ -65,6 +65,9 @@ class Config:
     # Minimum RMS to treat a captured clip as speech (lower = more sensitive, but more
     # silence hallucinations). Lower it for a weak microphone.
     min_speech_rms: float = field(default_factory=lambda: float(os.getenv("SUFLER_MIN_SPEECH_RMS", "0.004") or "0.004"))
+    # Comma-separated allowed STT languages; transcripts in other languages are discarded
+    # (kills silence hallucinations that come out as random foreign text). Empty = allow all.
+    stt_allowed_langs: str = field(default_factory=lambda: os.getenv("SUFLER_STT_ALLOWED_LANGS", "ru,en"))
     loopback_device: str = field(default_factory=lambda: os.getenv("SUFLER_LOOPBACK_DEVICE", ""))
 
     # UI
