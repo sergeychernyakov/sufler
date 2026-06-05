@@ -249,6 +249,8 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         # "Thinking" spinner shown in the answer area until the first LLM token arrives.
         self._got_answer_token: bool = False
         self._answer_raw: str = ""
+        # Fragments recoloured for the currently-hovered transcript link (to restore on leave).
+        self._hovered: list[tuple[QtGui.QTextCursor, QtGui.QBrush]] = []
         self._thinking_frame: int = 0
         self._thinking_timer = QtCore.QTimer(self)
         self._thinking_timer.timeout.connect(self._on_thinking_tick)
@@ -578,6 +580,7 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         self._answer_label.linkActivated.connect(self._on_answer_link)
         self._transcript.anchorClicked.connect(lambda url: self._on_answer_link(url.toString()))
         self._transcript.selectionChanged.connect(self._on_transcript_selection)
+        self._transcript.highlighted[QtCore.QUrl].connect(self._on_transcript_hover)
         self._answer_label.installEventFilter(self)  # capture answer-text selection on release
         self._pin_button.clicked.connect(self.pin_toggled)
         self._capture_button.clicked.connect(self._on_capture_clicked)
@@ -1020,6 +1023,36 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
         """Puts the transcript's current selection into the manual-input field."""
         self._selection_to_input(self._transcript.textCursor().selectedText())
 
+    def _on_transcript_hover(self, url: QtCore.QUrl) -> None:
+        """Recolours the hovered transcript link (QTextBrowser can't do CSS ``:hover``)."""
+        # Restore the previously-hovered fragments to their original colour.
+        for cursor, brush in self._hovered:
+            fmt = QtGui.QTextCharFormat()
+            fmt.setForeground(brush)
+            cursor.mergeCharFormat(fmt)
+        self._hovered = []
+        href = url.toString()
+        if not href:
+            return
+        hot = QtGui.QTextCharFormat()
+        hot.setForeground(QtGui.QColor("#ffffff"))
+        document = self._transcript.document()
+        if document is None:
+            return
+        block = document.begin()
+        while block.isValid():
+            iterator = block.begin()
+            while not iterator.atEnd():
+                fragment = iterator.fragment()
+                if fragment.isValid() and fragment.charFormat().anchorHref() == href:
+                    cursor = QtGui.QTextCursor(document)
+                    cursor.setPosition(fragment.position())
+                    cursor.setPosition(fragment.position() + fragment.length(), QtGui.QTextCursor.MoveMode.KeepAnchor)
+                    self._hovered.append((cursor, fragment.charFormat().foreground()))
+                    cursor.mergeCharFormat(hot)
+                iterator += 1
+            block = block.next()
+
     def eventFilter(self, obj: QtCore.QObject | None, event: QtCore.QEvent | None) -> bool:  # noqa: N802  (Qt override)
         """On mouse-release over the answer, copies its selection into the input field."""
         if obj is self._answer_label and event is not None and event.type() == QtCore.QEvent.Type.MouseButtonRelease:
@@ -1145,17 +1178,19 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
 
     @staticmethod
     def _linkify_words(text: str) -> str:
-        """Renders recognized text: each word a link, with a "·" between words for pairs.
+        """Renders recognized text with clickable words, pair dots and a sentence dot.
 
-        A single word click looks up that word; a click on the ``·`` between two words
-        looks up that **pair of words**. (For longer phrases, select the text — it drops
-        into the manual-input field.)
+        * each word → single-word lookup;
+        * a ``·`` between two words → that **pair of words**;
+        * a ``•`` at the end of each sentence → the **whole sentence**.
+
+        (For an arbitrary span, select the text — it drops into the manual-input field.)
 
         Args:
             text (str): Plain recognized text.
 
         Returns:
-            str: HTML with per-word links and between-word pair dots.
+            str: HTML with per-word links, between-word pair dots and per-sentence dots.
         """
 
         def word_link(word: str) -> str:
@@ -1163,33 +1198,40 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
                 f'<a href="term:{quote(word)}" style="color:#cfe8ff; text-decoration:none;">' f"{html.escape(word)}</a>"
             )
 
-        # Split into words and the separators between them, so we can place dots in gaps.
-        parts = re.split(r"(\s+)", text.strip())
-        words = [(i, p) for i, p in enumerate(parts) if p and not p.isspace()]
+        def dot(href: str, glyph: str, tip: str) -> str:
+            # Big glyph + non-breaking spaces around it = an easy click target.
+            return (
+                f'<a href="term:{quote(href)}" title="{html.escape(tip)}" '
+                f'style="color:#ffcf5b; text-decoration:none; font-weight:bold; font-size:22px;">'
+                f"&nbsp;{glyph}&nbsp;</a>"
+            )
+
         out: list[str] = []
-        for idx, part in enumerate(parts):
-            if part.isspace():
+        for sentence in re.split(r"(?<=[.!?])\s+", text.strip()):
+            sentence = sentence.strip()
+            if not sentence:
                 continue
-            # Is this token a real word (starts with a letter, ≥2 chars)?
-            core = part.strip(".,!?;:()«»\"'")
-            if len(core) >= 2 and core[0].isalpha():
-                out.append(word_link(core))
-                # Append any trailing punctuation that was on the token.
-                tail = part[part.rfind(core) + len(core) :]
-                if tail:
-                    out.append(html.escape(tail))
-            else:
-                out.append(html.escape(part))
-            # A "·" between this word and the next → looks up the two-word phrase.
-            nxt = next((w for w in words if w[0] > idx), None)
-            this_core = core if (len(core) >= 2 and core[0].isalpha()) else part.strip()
-            if nxt is not None and this_core:
-                next_core = nxt[1].strip(".,!?;:()«»\"'")
-                pair = f"{this_core} {next_core}".strip()
-                out.append(
-                    f' <a href="term:{quote(pair)}" title="Спросить про два слова: {html.escape(pair)}" '
-                    f'style="color:#ffcf5b; text-decoration:none; font-weight:bold;">·</a> '
-                )
+            parts = re.split(r"(\s+)", sentence)
+            cores = [(i, p.strip(".,!?;:()«»\"'")) for i, p in enumerate(parts) if p and not p.isspace()]
+            for idx, part in enumerate(parts):
+                if part.isspace():
+                    continue
+                core = part.strip(".,!?;:()«»\"'")
+                if len(core) >= 2 and core[0].isalpha():
+                    out.append(word_link(core))
+                    tail = part[part.rfind(core) + len(core) :]
+                    if tail:
+                        out.append(html.escape(tail))
+                else:
+                    out.append(html.escape(part))
+                # "·" between this word and the next → the two-word phrase.
+                nxt = next((c for c in cores if c[0] > idx), None)
+                this_core = core if (len(core) >= 2 and core[0].isalpha()) else part.strip()
+                if nxt is not None and this_core and nxt[1]:
+                    pair = f"{this_core} {nxt[1]}"
+                    out.append(dot(pair, "·", f"Два слова: {pair}"))
+            # "•" at sentence end → the whole sentence.
+            out.append(dot(sentence, "•", "Всё предложение"))
         return "".join(out)
 
     def clear_transcript(self) -> None:

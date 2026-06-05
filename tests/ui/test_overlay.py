@@ -739,15 +739,36 @@ def test_tag_chip_click_emits_term_activated(overlay: Overlay, qtbot) -> None:
 
 
 def test_transcript_words_are_clickable_links() -> None:
-    """Every word is a clickable link; a "·" between words looks up the pair."""
+    """Words are links; "·" between words = pair; "•" at sentence end = whole sentence."""
     from urllib.parse import quote
 
     html_line = Overlay._linkify_words("расскажи про REST")
-    # 3 word links + 2 between-word pair dots.
-    assert html_line.count('href="term:') == 5
-    assert "·" in html_line
-    # The dot between the first two words carries the two-word phrase.
-    assert f'href="term:{quote("расскажи про")}"' in html_line
+    # 3 word links + 2 between-word pair dots + 1 sentence dot.
+    assert html_line.count('href="term:') == 6
+    assert "·" in html_line  # pair dots
+    assert "•" in html_line  # sentence dot
+    assert f'href="term:{quote("расскажи про")}"' in html_line  # pair link
+
+
+def test_transcript_sentence_dot_links_whole_sentence() -> None:
+    """The "•" at a sentence end carries the whole sentence."""
+    from urllib.parse import quote
+
+    html_line = Overlay._linkify_words("Что такое REST?")
+    assert f'href="term:{quote("Что такое REST?")}"' in html_line
+
+
+def test_transcript_hover_recolor_does_not_crash(overlay: Overlay) -> None:
+    """Hovering a transcript link recolours it and restores on leave without error."""
+    from urllib.parse import quote
+
+    from PyQt6.QtCore import QUrl
+
+    overlay.append_transcript("что такое mutex")
+    overlay._on_transcript_hover(QUrl(f"term:{quote('mutex')}"))  # hover a word
+    assert overlay._hovered  # something got recoloured
+    overlay._on_transcript_hover(QUrl(""))  # leave restores
+    assert overlay._hovered == []
 
 
 def test_selection_fills_input_field(overlay: Overlay) -> None:
