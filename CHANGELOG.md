@@ -74,6 +74,7 @@ line under `[Unreleased]`**.
 - **Two parallel passes over recognized speech** — (1) technical terms are extracted heuristically
   from every utterance (no LLM, Latin-script tokens like `REST`/`deadlock`) and added to the tag
   cloud; (2) questions are detected and answered as before. _feat(controller)_
+- **"Очистить" button** — clears the recognition feed. _feat(ui)_
 - **Clickable words in the recognition feed** — every word in the live transcript is now a link;
   clicking it asks the LLM for a definition, exactly like a tag chip. _feat(ui)_
 
