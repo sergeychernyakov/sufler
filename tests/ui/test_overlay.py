@@ -568,6 +568,15 @@ def test_linkify_turns_code_spans_into_links() -> None:
     assert "REST" in out
 
 
+def test_linkify_links_plain_latin_terms_without_markers() -> None:
+    """Even with no **/` markers, English terms in the answer become clickable links."""
+    out = Overlay._linkify("создание consistent bedtime routine и blue light")
+    # consistent, bedtime, routine, blue, light -> 5 links
+    assert out.count('<a href="term:') == 5
+    assert ">consistent</a>" in out
+    assert "создание" in out  # Russian filler stays plain text
+
+
 def test_answer_link_click_emits_decoded_term(overlay: Overlay, qtbot) -> None:
     """Clicking a term link emits ``term_activated`` with the URL-decoded term."""
     with qtbot.waitSignal(overlay.term_activated, timeout=1000) as blocker:

@@ -1021,19 +1021,36 @@ class Overlay(QtWidgets.QWidget):  # pylint: disable=too-many-instance-attribute
             raw (str): The raw answer text.
 
         Returns:
-            str: HTML where every ``**term**`` is an ``<a href="term:...">`` link, other
-            text is HTML-escaped and newlines become ``<br>``.
+            str: HTML where ``**term**``/`` `code` `` markers and Latin-script technical
+            terms become ``<a href="term:...">`` links; other text is escaped and newlines
+            become ``<br>``.
         """
         out: list[str] = []
         last = 0
-        # Link bold **terms** (thesis headers) and `code` spans (the English terms).
+        # Bold **terms** and `code` spans become bright links; the plain text between them
+        # still gets its Latin/English technical terms linked (so term-less answers link too).
         for match in re.finditer(r"\*\*(.+?)\*\*|`([^`]+)`", raw):
-            out.append(html.escape(raw[last : match.start()]))
+            out.append(Overlay._latin_links(raw[last : match.start()]))
             term = (match.group(1) or match.group(2) or "").strip()
             out.append(f'<a href="term:{quote(term)}" style="color:#9ad1ff;">{html.escape(term)}</a>')
             last = match.end()
-        out.append(html.escape(raw[last:]))
+        out.append(Overlay._latin_links(raw[last:]))
         return "".join(out).replace("\n", "<br>")
+
+    @staticmethod
+    def _latin_links(text: str) -> str:
+        """Escapes ``text`` and turns Latin-script technical terms into clickable links."""
+        out: list[str] = []
+        last = 0
+        for match in re.finditer(r"[A-Za-z][A-Za-z0-9+#.\-]{2,}", text):
+            out.append(html.escape(text[last : match.start()]))
+            word = match.group(0)
+            out.append(
+                f'<a href="term:{quote(word)}" style="color:#9ad1ff; text-decoration:none;">' f"{html.escape(word)}</a>"
+            )
+            last = match.end()
+        out.append(html.escape(text[last:]))
+        return "".join(out)
 
     def _on_answer_link(self, href: str) -> None:
         """Emits :pyattr:`term_activated` when a term link (answer or tag) is clicked."""
