@@ -758,6 +758,16 @@ def test_transcript_sentence_dot_links_whole_sentence() -> None:
     assert f'href="term:{quote("Что такое REST?")}"' in html_line
 
 
+def test_transcript_preserves_leading_and_trailing_punctuation() -> None:
+    """Punctuation around a word (quotes, brackets, commas) is kept, not dropped."""
+    html_line = Overlay._linkify_words("он сказал «привет», (REST)")
+    for ch in ("«", "»", ",", "(", ")"):
+        assert ch in html_line
+    # The words themselves are still links.
+    assert ">привет</a>" in html_line
+    assert ">REST</a>" in html_line
+
+
 def test_transcript_hover_recolor_does_not_crash(overlay: Overlay) -> None:
     """Hovering a transcript link recolours it and restores on leave without error."""
     from urllib.parse import quote

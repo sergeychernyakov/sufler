@@ -77,7 +77,15 @@ line under `[Unreleased]`**.
 - **Clickable words in the recognition feed** — every word in the live transcript is now a link;
   clicking it asks the LLM for a definition, exactly like a tag chip. _feat(ui)_
 
+### Added
+- **Faster recognition updates** — the transcript now finalizes after a shorter pause (0.45 s) and
+  caps utterances at 5 s, so recognized text appears more often. Tunable via `SUFLER_STT_SILENCE`
+  and `SUFLER_STT_MAX_UTTERANCE`. _feat(audio)_
+
 ### Fixed
+- **Dropped punctuation in the recognition feed** — leading punctuation (opening quotes, brackets,
+  dashes) around a word was stripped and not re-added when linkifying; now both leading and trailing
+  punctuation are preserved. _fix(ui)_
 - **Crash (SIGSEGV) under heavy speech** — overlapping utterances spawned concurrent MLX Whisper
   transcriptions, and MLX/Metal is not thread-safe, so two simultaneous `eval` calls segfaulted the
   app shortly after launch. Transcription is now serialized (one at a time); an utterance arriving
