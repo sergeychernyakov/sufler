@@ -22,6 +22,7 @@ inside :meth:`MlxWhisperEngine.transcribe` so the app (and the test suite) run
 fine on machines where the heavy native dependency is not installed.
 """
 
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -63,7 +64,14 @@ def _is_degenerate(text: str) -> bool:
     if len(set(stripped)) / len(stripped) < 0.12:
         return True
     words = stripped.split()
-    return len(words) >= 5 and len(set(words)) / len(words) < 0.35
+    if len(words) >= 5 and len(set(words)) / len(words) < 0.35:
+        return True
+    # Sentence-level repetition, e.g. "Thank you. Thank you. Thank you." — Whisper loops
+    # a short phrase on near-silence. Discard if one sentence dominates the repetitions.
+    sentences = [s.strip().lower() for s in re.split(r"[.!?]+", stripped) if s.strip()]
+    if len(sentences) >= 3 and len(set(sentences)) <= max(1, len(sentences) // 2):
+        return True
+    return False
 
 
 #: Substrings marking a Whisper hallucination on silence/non-speech — YouTube subtitle
@@ -246,6 +254,12 @@ class MlxWhisperEngine(STTEngine):
         )
         text = str(result.get("text", "")).strip()
         language = result.get("language")
+        allowed = {code.strip().lower() for code in config.stt_allowed_langs.split(",") if code.strip()}
+        if allowed and language is not None and str(language).lower() not in allowed:
+            # A detected language outside the allowlist is almost always a silence
+            # hallucination spoken as random foreign text — discard it.
+            logger.debug("Discarding transcript in disallowed language %r: %r", language, text[:60])
+            return Transcript(text="", language=language)
         if _is_degenerate(text) or _is_hallucination(text):
             logger.debug("Discarding hallucinated/degenerate transcript: %r", text[:60])
             return Transcript(text="", language=language)

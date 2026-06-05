@@ -47,8 +47,8 @@ line under `[Unreleased]`**.
 - **Session-wide back/forward** — a new question no longer clears history; back (←) / forward (→)
   now move through every previous hint and drill-down (browser-style). _feat(controller)_
 - **Tag cloud** — clickable pill chips of terms collected from answers, shown **above the
-  recognition area** (newest first, up to 20 unique); clicking one drills down like an inline term
-  link. _feat(ui)_
+  recognition area**, **sorted alphabetically** and fully visible (wrap, no scroll), up to 20
+  unique; clicking one drills down like an inline term link. _feat(ui)_
 - **Pin (📌)** — freeze the current answer: sufler keeps recognizing and answering in the
   background, and the new answers queue into forward history (reachable with →). _feat(ui)_
 - **In-window model selector** — a dropdown switches the answer model on the fly (the active
@@ -88,7 +88,9 @@ line under `[Unreleased]`**.
   partial cache); `local_files_only` is only an offline fallback. _fix(stt)_
 - **Filter Whisper silence hallucinations** — discard the YouTube-subtitle artefacts Whisper emits
   on non-speech (e.g. "Субтитры сделал DimaTorzok", "Продолжение следует", "Thank you.", a bare
-  "You") so they no longer appear in the window. _fix(stt)_
+  "You") so they no longer appear in the window. Now also: **discard transcripts in a non-allowed
+  language** (`SUFLER_STT_ALLOWED_LANGS`, default `ru,en` — kills random foreign garbage like Dutch
+  "welk een driet"), and **catch looped short phrases** ("Thank you. Thank you. Thank you."). _fix(stt)_
 
 ## [0.2.0] - 2026-06-03
 

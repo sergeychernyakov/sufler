@@ -690,6 +690,16 @@ def test_tags_render_as_chip_buttons(overlay: Overlay) -> None:
     assert {"REST", "thread"} <= labels
 
 
+def test_tag_chips_are_displayed_alphabetically(overlay: Overlay) -> None:
+    """Chips render in case-insensitive alphabetical order regardless of insertion order."""
+    overlay.add_tags(["thread", "Active Record", "mutex"])
+    chips = overlay._tags_container.findChildren(type(overlay._copy_button), "tagChip")
+    # findChildren preserves child-creation order, which is the render order.
+    rendered = [c.text() for c in chips]
+    assert rendered == sorted(rendered, key=str.lower)
+    assert rendered == ["Active Record", "mutex", "thread"]
+
+
 def test_add_tags_dedups_prepends_and_caps_at_20(overlay: Overlay) -> None:
     """New unique tags go to the front; duplicates are ignored; list is capped at 20."""
     overlay.add_tags(["a", "b"])
